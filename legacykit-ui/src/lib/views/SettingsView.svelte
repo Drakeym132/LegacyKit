@@ -1,5 +1,36 @@
 <script lang="ts">
   import { settingsStore } from '$lib/stores/settingsStore.svelte';
+  import { checkForUpdates, type UpdateCheckResult } from '$lib/api/updates';
+  import { toastStore } from '$lib/stores/toastStore.svelte';
+
+  const APP_VERSION = '0.1.0';
+  const UPDATE_REPO = 'Drakeym132/LegacyKit';
+
+  let isCheckingUpdates = $state(false);
+  let updateResult = $state<UpdateCheckResult | null>(null);
+
+  async function handleCheckUpdates() {
+    isCheckingUpdates = true;
+    try {
+      updateResult = await checkForUpdates({
+        repo: UPDATE_REPO,
+        currentVersion: APP_VERSION,
+      });
+      if (updateResult.updateAvailable) {
+        toastStore.info(
+          `Update available: ${updateResult.latest}`,
+          updateResult.releaseUrl ?? null,
+        );
+      } else {
+        toastStore.success('You are on the latest version', `v${updateResult.current}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toastStore.error('Update check failed', msg);
+    } finally {
+      isCheckingUpdates = false;
+    }
+  }
 
   function handleThemeChange(event: Event) {
     const target = event.target as HTMLSelectElement;
@@ -119,10 +150,42 @@
     </div>
   </div>
 
+  <div class="settings-group">
+    <h3>Updates</h3>
+    <div class="setting-row">
+      <div class="setting-info">
+        <label for="update-check">Check for updates</label>
+        <span class="setting-hint">Compares against the latest GitHub release</span>
+      </div>
+      <button
+        id="update-check"
+        class="update-button"
+        onclick={handleCheckUpdates}
+        disabled={isCheckingUpdates}
+      >
+        {isCheckingUpdates ? 'Checking…' : 'Check now'}
+      </button>
+    </div>
+    {#if updateResult}
+      <div class="update-result" data-state={updateResult.updateAvailable ? 'available' : 'current'}>
+        {#if updateResult.updateAvailable}
+          <strong>Update available</strong>
+          <p>You are on v{updateResult.current}. Latest is v{updateResult.latest}.</p>
+          {#if updateResult.releaseUrl}
+            <p><a href={updateResult.releaseUrl} target="_blank" rel="noopener">Open release page</a></p>
+          {/if}
+        {:else}
+          <strong>You are up to date</strong>
+          <p>v{updateResult.current} matches the latest release.</p>
+        {/if}
+      </div>
+    {/if}
+  </div>
+
   <div class="settings-group about-section">
     <h3>About</h3>
     <div class="about-card">
-      <p class="app-name">LegacyKit <span class="version">v0.1.0</span></p>
+      <p class="app-name">LegacyKit <span class="version">v{APP_VERSION}</span></p>
       <p class="about-description">A modern toolkit for managing legacy iOS devices. Restore, jailbreak, manage SHSH blobs, and more — all from a single native application.</p>
     </div>
   </div>
@@ -291,4 +354,32 @@
     line-height: 1.5;
     margin: 0;
   }
+
+  .update-button {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    cursor: pointer;
+  }
+  .update-button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .update-button:hover:not(:disabled) { border-color: var(--color-accent); color: var(--color-accent); }
+
+  .update-result {
+    margin-top: 8px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    font-size: 0.85rem;
+  }
+  .update-result strong { color: var(--color-text-primary); display: block; }
+  .update-result p { color: var(--color-text-secondary); margin: 4px 0 0; }
+  .update-result[data-state="available"] strong { color: var(--color-accent); }
+  .update-result[data-state="current"] strong { color: var(--color-success); }
+  .update-result a { color: var(--color-accent); text-decoration: none; }
+  .update-result a:hover { text-decoration: underline; }
 </style>
