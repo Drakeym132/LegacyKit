@@ -8,6 +8,7 @@
   } from '$lib/api/apps';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
+  import { toastStore } from '$lib/stores/toastStore.svelte';
 
   let scope = $state<AppListScope>('user');
   let apps = $state<InstalledApp[]>([]);
@@ -36,10 +37,12 @@
     try {
       const result = await fn();
       logStore.append(`${label} ok`, 'info');
+      toastStore.success(label, 'Completed');
       return result;
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : String(err);
       logStore.append(`${label} failed: ${errorMessage}`, 'stderr');
+      toastStore.error(`${label} failed`, errorMessage);
       return null;
     } finally {
       isWorking = false;

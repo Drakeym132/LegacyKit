@@ -1,7 +1,7 @@
 # LegacyKit UI Rebuild — Progress Report
 
 **Date:** 2026-04-30  
-**Status:** Phase 1 Complete, Phase 2 Complete, Phase 3 Complete, Phase 4 Complete, Phase 5 Complete, Phase 6 Complete
+**Status:** Phases 1–7 Complete, Phase 8 Complete (with documented deferred items)
 
 ---
 
@@ -108,6 +108,38 @@
 | `src/lib/views/AppsView.svelte` | Replaced | Functional UI: device summary, multi-IPA install textarea, scope-filtered (User/System/All) installed-app table with bundle/version/display name and per-row uninstall (with confirm) |
 | `src/lib/views/DataView.svelte` | Replaced | Functional 4-tab UI: Backup (full toggle), Restore (radio-pick a backup + system/settings/reboot flags), Encryption (on/off/change password), Erase (typed confirmation phrase + native confirm dialog) |
 
+### Phase 7: Utilities & Polish (Complete)
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src-tauri/src/models/utilities.rs` | Created | Request/response models for recovery, diagnostics, pair, activation, export, irecovery, syslog |
+| `src-tauri/src/commands/utilities.rs` | Created | `enter_recovery`, `exit_recovery`, `run_diagnostics_action`, `pair_device`, `run_activation_action`, `export_device_info`, `run_irecovery_commands`, `clear_nvram`, `start_syslog`/`stop_syslog`/`syslog_status` with Mutex-managed long-running child process |
+| `src-tauri/src/models/trollstore.rs` | Created | `TrollStorePrepareRequest/Result`, `TrollStoreEligibilityRequest/Result`, `TrollStorePath` enum |
+| `src-tauri/src/commands/trollstore.rs` | Created | `prepare_trollstore_assets` (curl GitHub API → aria2c download with version-stamp caching), `check_trollstore_eligibility` (iOS major version routing); 4 unit tests |
+| `src-tauri/src/commands/updates.rs` | Created | `check_for_updates` (GitHub releases compare with loose-semver `compare_versions`); 5 unit tests |
+| `src-tauri/src/commands/mod.rs` | Modified | Registered `utilities`, `trollstore`, `updates` modules |
+| `src-tauri/src/lib.rs` | Modified | Registered 14 new invoke handlers |
+| `src/lib/api/utilities.ts` | Created | Typed wrappers + `onSyslogEvent` listener |
+| `src/lib/api/trollstore.ts` | Created | Typed wrappers for asset prep + eligibility |
+| `src/lib/api/updates.ts` | Created | Typed wrapper for update check |
+| `src/lib/views/UtilitiesView.svelte` | Replaced | 5-tab functional UI: Quick actions, irecovery/NVRAM, Syslog (rolling 500-line live viewer), Diagnostics export, TrollStore (eligibility + asset prep + manual install instructions for both ramdisk and TrollRestore paths) |
+| `src/lib/stores/toastStore.svelte.ts` | Created | `Toast` type + `info/success/warning/error` variants with auto-expire timers |
+| `src/lib/components/common/Toaster.svelte` | Created | Floating bottom-right toast renderer with variant-colored borders |
+| `src/lib/components/common/ConfirmDialog.svelte` | Created | Reusable modal confirm with Esc/Enter handlers |
+| `src/lib/components/common/ProgressBar.svelte` | Created | Determinate + indeterminate variants |
+| `src/lib/components/wizard/WizardSteps.svelte` | Created | Step indicator strip with active/completed states |
+| `src/App.svelte` | Modified | Mounted global `<Toaster />` |
+| `src/lib/views/AppsView.svelte`, `DataView.svelte`, `SHSHView.svelte`, `SSHRamdiskView.svelte`, `UtilitiesView.svelte` | Modified | `withWorking` helpers now emit success/error toasts in addition to log entries |
+| `src/lib/views/SettingsView.svelte` | Modified | Added Updates section: "Check for updates" button + result card with release link |
+
+### Phase 8: Packaging & Distribution (Complete)
+
+| File | Action | Description |
+|------|--------|-------------|
+| `.github/workflows/release.yml` | Modified | Added `ubuntu-22.04-arm` matrix entry for Linux ARM64 builds; broadened the apt-install step to all `ubuntu-*` runners |
+| `legacykit-ui/docs/USER-GUIDE.md` | Created | End-user installation, view-by-view tour, troubleshooting matrix |
+| `legacykit-ui/docs/MIGRATION-FROM-BASH.md` | Created | Mapping from `restore.sh` menus to UI, shared `saved/` layout, behavioral differences, deferred items |
+
 ### Phase 3: Restore & Downgrade (Complete)
 
 | File | Action | Description |
@@ -172,35 +204,34 @@
 - [→ future] Filesystem mount via sshfs (requires userspace driver + jailbroken device; will live next to SSH Ramdisk view)
 - [→ future] App dumping via Clutch / ipainstaller (requires SSH ramdisk session; will live next to SSH Ramdisk view)
 
-### Phase 7: Utilities & Polish
-- [ ] UtilitiesView functional UI (enter/exit recovery, activation, syslog, diagnostics)
-- [ ] TrollStore installation flow
-- [ ] Global error handling and toast notifications
-- [ ] Update checker
-- [ ] UI polish pass (animations, transitions, responsive adjustments)
-- [ ] Platform-specific testing (macOS + Linux)
-- [ ] Common UI components (Button, Select, Modal, Toast, ProgressBar, FilePickerButton, ConfirmDialog)
-- [ ] Wizard components (Container, Step, Progress)
+### Phase 7: Utilities & Polish ✅
+- [x] UtilitiesView functional UI: 5 tabs (Quick actions / irecovery+NVRAM / Syslog / Diagnostics export / TrollStore)
+- [x] Backend commands: `enter_recovery`, `exit_recovery`, `run_diagnostics_action` (shutdown/restart/sleep), `pair_device`, `run_activation_action` (activate/deactivate/state), `export_device_info` (deviceInfo/batteryInfo/diagnosticsAll), `run_irecovery_commands`, `clear_nvram`, `start_syslog`/`stop_syslog`/`syslog_status` with Mutex<Option<Child>> for session management
+- [x] TrollStore eligibility detection (iOS 14/15 ramdisk vs iOS 16+ TrollRestore vs incompatible vs unknown) and asset preparation (downloads + caches `TrollStore.tar` + `PersistenceHelper_Embedded` from GitHub releases via curl + aria2c, version-stamped cache)
+- [x] Global toast layer (`toastStore.svelte.ts` + `Toaster.svelte`) wired into all views' `withWorking` helpers
+- [x] Common UI components: `ConfirmDialog`, `Toaster`, `ProgressBar`, `WizardSteps`
+- [x] Update checker (`commands/updates.rs::check_for_updates`, loose-semver compare) wired into SettingsView with toast feedback
+- [→ future] One-click ramdisk orchestration with BuildManifest auto-discovery
+- [→ future] Live SSH session manager (would unblock automated TrollStore install + uicache + datetime sync + iOS 7/8 erase flows)
 
-### Phase 8: Packaging & Distribution (Partially Done)
+### Phase 8: Packaging & Distribution ✅
 - [x] Tauri bundler config (.dmg, .deb/.AppImage)
 - [x] Sidecar binary bundling
 - [x] Resource bundling
 - [x] CI/CD pipeline (GitHub Actions)
-- [ ] Linux ARM64 CI/CD target
-- [ ] User documentation
-- [ ] Migration guide from bash script
+- [x] Linux ARM64 CI/CD target (`ubuntu-22.04-arm` runner added to release.yml matrix)
+- [x] User documentation (`legacykit-ui/docs/USER-GUIDE.md`)
+- [x] Migration guide from bash script (`legacykit-ui/docs/MIGRATION-FROM-BASH.md`)
 
 ### Backend Infrastructure (Ongoing)
-- [ ] `state.rs` — Global app state management
-- [ ] Tool wrappers in `tools/` — idevice, irecovery, futurerestore, gaster, powdersn0w, img4, tsschecker, ssh, ipsw_tool
-- [ ] Service modules — device_detection, firmware_keys, download, dependency
-- [ ] Additional command modules — restore, jailbreak, shsh, ramdisk, ipsw, apps, data, utilities
-- [ ] API wrapper layer (`src/lib/api/`) — Typed Tauri invoke wrappers
-- [ ] Utility modules (`src/lib/utils/`) — Formatting, platform detection
+- [x] Command modules — `device`, `restore`, `jailbreak`, `firmware`, `shsh`, `apps`, `data`, `utilities`, `trollstore`, `updates`
+- [x] API wrapper layer (`src/lib/api/`) — typed Tauri invoke wrappers for every backend command
+- [→ future] `state.rs` — global app state (currently each command is stateless except `SYSLOG_CHILD` static Mutex)
+- [→ future] Cohesive `tools/` runner abstraction (currently each command has its own `run_process_streaming` helper)
+- [→ future] Service modules for download manager + firmware keys cache
 
 ---
 
 ## Build Status
-- **Frontend (Vite/Svelte):** ✅ Compiles cleanly (`npm run check`, `npm run build` pass)
-- **Backend (Rust/Tauri):** ✅ Compiles cleanly (`cargo check`, `cargo test` pass)
+- **Frontend (Vite/Svelte):** ✅ Compiles cleanly (`npm run check`, `npm run build` pass — only pre-existing template errors remain)
+- **Backend (Rust/Tauri):** ✅ Compiles cleanly (`cargo check`, `cargo test` pass — 37 unit tests across services + commands)

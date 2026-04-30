@@ -1,6 +1,7 @@
 <script lang="ts">
   import Sidebar from './lib/components/layout/Sidebar.svelte';
   import ContentArea from './lib/components/layout/ContentArea.svelte';
+  import Toaster from './lib/components/common/Toaster.svelte';
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
@@ -84,3 +85,4 @@
   <Sidebar />
   <ContentArea />
 </div>
+<Toaster />
