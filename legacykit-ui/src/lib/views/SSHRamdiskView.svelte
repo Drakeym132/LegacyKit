@@ -7,15 +7,18 @@
     patchKernel,
     repackImg3,
     type IbootBitWidth,
-  } from '$lib/api/firmware';
-  import { runKloader } from '$lib/api/jailbreak';
-  import { deviceStore } from '$lib/stores/deviceStore.svelte';
-  import { logStore } from '$lib/stores/logStore.svelte';
-  import { toastStore } from '$lib/stores/toastStore.svelte';
+  } from '../../api/firmware';
+  import { runKloader } from '../../api/jailbreak';
+  import { recordJustBoot } from '../../api/justBoot';
+  import { deviceStore } from '../../stores/deviceStore.svelte';
+  import { logStore } from '../../stores/logStore.svelte';
+  import { toastStore } from '../../stores/toastStore.svelte';
 
   let ipswPath = $state('');
   let outputDir = $state('');
   let bootArgs = $state('rd=md0 -v amfi_get_out_of_my_way=0x1 cs_enforcement_disable=1');
+  let buildId = $state(''); // Added for Just Boot recording
+  let iosVersion = $state(''); // Added for Just Boot recording
   let ibssIpswPath = $state('');
   let ibecIpswPath = $state('');
   let kernelIpswPath = $state('');
@@ -69,9 +72,10 @@
       toastStore.success(label, 'Completed');
       return result;
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : String(error);
-      logStore.append(`${label} failed: ${errorMessage}`, 'stderr');
-      toastStore.error(`${label} failed`, errorMessage);
+      const msg = error instanceof Error ? error.message : String(error);
+      errorMessage = msg;
+      logStore.append(`${label} failed: ${msg}`, 'stderr');
+      toastStore.error(`${label} failed`, msg);
       return null;
     } finally {
       isWorking = false;
@@ -83,163 +87,107 @@
       errorMessage = 'Source IPSW and output directory are required.';
       return;
     }
-
-    const targets: Array<{ entry: string; out: string; setter: (v: string) => void }> = [
-      { entry: ibssIpswPath, out: joinOut('iBSS.bin'), setter: (v) => (extractedIbss = v) },
-      { entry: ibecIpswPath, out: joinOut('iBEC.bin'), setter: (v) => (extractedIbec = v) },
-      { entry: kernelIpswPath, out: joinOut('kernelcache.bin'), setter: (v) => (extractedKernel = v) },
-      { entry: ramdiskIpswPath, out: joinOut('ramdisk.dmg'), setter: (v) => (extractedRamdisk = v) },
-    ];
-
-    for (const target of targets) {
-      if (!target.entry.trim()) continue;
-      const result = await withWorking(`Extracting ${target.entry}`, () =>
-        extractIpswComponent({ ipswPath, componentPath: target.entry, outputPath: target.out })
-      );
-      if (!result) return;
-      target.setter(result.outputPath);
-    }
+    const result = await withWorking('Extract all IPSW components', async () => {
+      const [ibss, ibec, kernel, ramdisk] = await Promise.all([
+        extractIpswComponent({ ipswPath, componentPath: ibssIpswPath, outputPath: joinOut('iBSS.dec') }),
+        extractIpswComponent({ ipswPath, componentPath: ibecIpswPath, outputPath: joinOut('iBEC.dec') }),
+        extractIpswComponent({ ipswPath, componentPath: kernelIpswPath, outputPath: joinOut('kernelcache.dec') }),
+        extractIpswComponent({ ipswPath, componentPath: ramdiskIpswPath, outputPath: joinOut('ramdisk.dmg') }),
+      ]);
+      extractedIbss = ibss.outputPath;
+      extractedIbec = ibec.outputPath;
+      extractedKernel = kernel.outputPath;
+      extractedRamdisk = ramdisk.outputPath;
+    });
+    if (!result) return;
   }
 
-  async function handlePatchIboots() {
-    if (!extractedIbss || !extractedIbec) {
-      errorMessage = 'Extract iBSS and iBEC first.';
+  async function handlePatchIboot() {
+    if (!extractedIbss) {
+      errorMessage = 'Extract iBSS first.';
       return;
     }
+    const result = await withWorking('Patch iBSS', async () => {
+      const patched = await patchIboot({ inputPath: extractedIbss, bootArgs, bitWidth });
+      patchedIbss = patched.outputPath;
+    });
+    if (!result) return;
+  }
 
-    const ibssOut = joinOut('iBSS.patched.bin');
-    const ibecOut = joinOut('iBEC.patched.bin');
-
-    const ibssResult = await withWorking('Patching iBSS', () =>
-      patchIboot({
-        inputPath: extractedIbss,
-        outputPath: ibssOut,
-        bitWidth,
-        bootArgs: null,
-        bypassRsa: true,
-        debug: false,
-      })
-    );
-    if (!ibssResult) return;
-    patchedIbss = ibssResult.outputPath;
-
-    const ibecResult = await withWorking('Patching iBEC', () =>
-      patchIboot({
-        inputPath: extractedIbec,
-        outputPath: ibecOut,
-        bitWidth,
-        bootArgs: bootArgs || null,
-        bypassRsa: true,
-        debug: false,
-      })
-    );
-    if (!ibecResult) return;
-    patchedIbec = ibecResult.outputPath;
+  async function handlePatchIbec() {
+    if (!extractedIbec) {
+      errorMessage = 'Extract iBEC first.';
+      return;
+    }
+    const result = await withWorking('Patch iBEC', async () => {
+      const patched = await patchIboot({ inputPath: extractedIbec, bootArgs, bitWidth });
+      patchedIbec = patched.outputPath;
+    });
+    if (!result) return;
   }
 
   async function handlePatchKernel() {
     if (!extractedKernel) {
-      errorMessage = 'Extract the kernelcache first.';
+      errorMessage = 'Extract kernel first.';
       return;
     }
-    const out = joinOut('kernelcache.patched.bin');
-    const result = await withWorking('Patching kernel', () =>
-      patchKernel({
-        inputPath: extractedKernel,
-        outputPath: out,
-        bitWidth,
-        flags: ['-a', '-f'],
-      })
-    );
+    const result = await withWorking('Patch kernel', async () => {
+      const patched = await patchKernel({ inputPath: extractedKernel });
+      patchedKernel = patched.outputPath;
+    });
     if (!result) return;
-    patchedKernel = result.outputPath;
   }
 
-  async function handleResizeRamdisk() {
-    if (!extractedRamdisk) {
-      errorMessage = 'Extract the ramdisk first.';
-      return;
+  async function handleRepackComponent(component: 'ibss' | 'ibec' | 'kernel', inputPath: string, outputName: string) {
+    if (!shshPath) {
+      errorMessage = 'SHSH blob path is required for repacking.';
+      return null;
     }
-    await withWorking(`Growing ramdisk to ${ramdiskTargetSizeMb} MB`, () =>
-      modifyRamdisk({
-        ramdiskPath: extractedRamdisk,
-        action: 'resize',
-        sourcePath: null,
-        targetPath: null,
-        sizeMb: ramdiskTargetSizeMb,
-      })
-    );
-  }
-
-  async function handleInjectSshBinaries() {
-    if (!extractedRamdisk) {
-      errorMessage = 'Extract the ramdisk first.';
-      return;
-    }
-    if (!sshBinariesDir.trim()) {
-      errorMessage = 'Provide a directory of SSH binaries to inject.';
-      return;
-    }
-
-    const binaries = [
-      { local: 'dropbear', target: '/usr/local/bin/dropbear' },
-      { local: 'authorized_keys', target: '/var/root/.ssh/authorized_keys' },
-    ];
-    const baseDir = sshBinariesDir.replace(/\/$/, '');
-
-    for (const bin of binaries) {
-      const localPath = `${baseDir}/${bin.local}`;
-      const result = await withWorking(`Injecting ${bin.local}`, () =>
-        modifyRamdisk({
-          ramdiskPath: extractedRamdisk,
-          action: 'add',
-          sourcePath: localPath,
-          targetPath: bin.target,
-          sizeMb: null,
-        })
-      );
-      if (!result) return;
-    }
-  }
-
-  async function handleRepackComponent(label: string, inputPath: string, outName: string) {
-    const out = joinOut(outName);
-    if (bitWidth === 'bits64') {
-      const result = await withWorking(`Packing ${label} as IMG4`, () =>
-        packImg4({
-          im4pPath: inputPath,
-          outputPath: out,
-          shshPath: shshPath || null,
-          im4mPath: null,
-        })
-      );
-      return result?.outputPath ?? null;
-    }
-    const result = await withWorking(`Repacking ${label} as IMG3`, () =>
-      repackImg3({
-        inputPath,
-        outputPath: out,
-        templatePath: null,
-        key: null,
-        iv: null,
-      })
-    );
-    return result?.outputPath ?? null;
+    const result = await withWorking(`Repack ${component}`, async () => {
+      if (processorGen !== null && processorGen >= 7) {
+        const repacked = await packImg4({ inputPath, shshPath, outputPath: joinOut(outputName) });
+        return repacked.outputPath;
+      } else {
+        const repacked = await repackImg3({ inputPath, shshPath, outputPath: joinOut(outputName) });
+        return repacked.outputPath;
+      }
+    });
+    return result;
   }
 
   async function handleRepackAll() {
-    if (patchedIbss) {
-      const repacked = await handleRepackComponent('iBSS', patchedIbss, 'iBSS.repacked');
-      if (repacked) patchedIbss = repacked;
+    if (!patchedIbss) {
+      errorMessage = 'Patch iBSS first.';
+      return;
     }
-    if (patchedIbec) {
-      const repacked = await handleRepackComponent('iBEC', patchedIbec, 'iBEC.repacked');
-      if (repacked) patchedIbec = repacked;
+    const result = await withWorking('Repack all components', async () => {
+      const [ibss, ibec, kernel] = await Promise.all([
+        handleRepackComponent('ibss', patchedIbss, 'iBSS.repacked'),
+        patchedIbec ? handleRepackComponent('ibec', patchedIbec, 'iBEC.repacked') : Promise.resolve(null),
+        patchedKernel ? handleRepackComponent('kernel', patchedKernel, 'kernelcache.repacked') : Promise.resolve(null),
+      ]);
+      if (ibss) patchedIbss = ibss;
+      if (ibec) patchedIbec = ibec;
+      if (kernel) patchedKernel = kernel;
+    });
+    if (!result) return;
+  }
+
+  async function handleModifyRamdisk() {
+    if (!extractedRamdisk || !sshBinariesDir) {
+      errorMessage = 'Extracted ramdisk and SSH binaries directory are required.';
+      return;
     }
-    if (patchedKernel) {
-      const repacked = await handleRepackComponent('kernelcache', patchedKernel, 'kernelcache.repacked');
-      if (repacked) patchedKernel = repacked;
-    }
+    const result = await withWorking('Modify ramdisk', async () => {
+      const modified = await modifyRamdisk({
+        ramdiskPath: extractedRamdisk,
+        sshBinariesDir,
+        targetSizeMb: ramdiskTargetSizeMb,
+        outputPath: joinOut('ramdisk.modified.dmg'),
+      });
+      extractedRamdisk = modified.outputPath;
+    });
+    if (!result) return;
   }
 
   async function handleBoot() {
@@ -247,6 +195,27 @@
       errorMessage = 'Patched iBSS is required for kloader.';
       return;
     }
+    
+    // Record the boot attempt in Just Boot history
+    if (buildId.trim() && deviceStore.state.ecid) {
+      try {
+        await recordJustBoot({
+          ecid: deviceStore.state.ecid,
+          productType: deviceStore.state.product_type || '',
+          deviceName: deviceStore.state.name,
+          buildId: buildId.trim(),
+          iosVersion: iosVersion.trim() || null,
+          bootArgs: bootArgs.trim() || null,
+          repackedIbssPath: patchedIbss,
+          repackedIbecPath: patchedIbec || null,
+          sourceIpswPath: ipswPath
+        });
+      } catch (error) {
+        // Silently fail if recording doesn't work - don't break the boot process
+        console.warn('Failed to record boot in history:', error);
+      }
+    }
+    
     await withWorking('Booting via kloader', () =>
       runKloader({ ibssPath: patchedIbss, ibecPath: patchedIbec || null })
     );
@@ -267,364 +236,260 @@
       <strong>{productType ?? 'Not detected'}</strong>
     </div>
     <div>
-      <span class="label">Bit width</span>
-      <strong>{bitWidth === 'bits64' ? '64-bit (IMG4)' : '32-bit (IMG3)'}</strong>
-    </div>
-    <div>
       <span class="label">Mode</span>
       <strong>{mode}</strong>
     </div>
-  </section>
-
-  {#if errorMessage}
-    <div class="error-state">{errorMessage}</div>
-  {/if}
-
-  <section class="panel">
-    <div class="section-title">
-      <span>1</span>
-      <h2>Inputs</h2>
-    </div>
-    <div class="form-grid">
-      <label>
-        <span>Source IPSW</span>
-        <input bind:value={ipswPath} placeholder="/path/to/firmware.ipsw" />
-      </label>
-      <label>
-        <span>Output Directory</span>
-        <input bind:value={outputDir} placeholder="/path/to/work" />
-      </label>
-      <label>
-        <span>Boot Args</span>
-        <input bind:value={bootArgs} />
-      </label>
-      <label>
-        <span>SHSH (IMG4 packing)</span>
-        <input bind:value={shshPath} placeholder="Optional, 64-bit only" />
-      </label>
-    </div>
-    <div class="form-grid">
-      <label>
-        <span>iBSS path in IPSW</span>
-        <input bind:value={ibssIpswPath} placeholder="Firmware/dfu/iBSS.<board>.RELEASE.dfu" />
-      </label>
-      <label>
-        <span>iBEC path in IPSW</span>
-        <input bind:value={ibecIpswPath} placeholder="Firmware/dfu/iBEC.<board>.RELEASE.dfu" />
-      </label>
-      <label>
-        <span>Kernelcache path in IPSW</span>
-        <input bind:value={kernelIpswPath} placeholder="kernelcache.release.<chip>" />
-      </label>
-      <label>
-        <span>Ramdisk path in IPSW</span>
-        <input bind:value={ramdiskIpswPath} placeholder="<ramdisk>.dmg" />
-      </label>
+    <div>
+      <span class="label">Processor</span>
+      <strong>{processorGen ? `A${processorGen}` : 'Unknown'}</strong>
     </div>
   </section>
 
   <section class="panel">
-    <div class="section-title">
-      <span>2</span>
-      <h2>Extract Components</h2>
-    </div>
+    <h2>Input</h2>
+    <p>Provide the source IPSW and the paths to the components you want to extract.</p>
+
+    <label class="field">
+      <span>Source IPSW</span>
+      <input bind:value={ipswPath} placeholder="/path/to/firmware.ipsw" />
+    </label>
+
+    <label class="field">
+      <span>Build ID (for Just Boot recording)</span>
+      <input bind:value={buildId} placeholder="e.g. 13G36" />
+    </label>
+
+    <label class="field">
+      <span>iOS Version (optional)</span>
+      <input bind:value={iosVersion} placeholder="e.g. 9.3.5" />
+    </label>
+
+    <label class="field">
+      <span>Output directory</span>
+      <input bind:value={outputDir} placeholder="/path/to/output" />
+    </label>
+
+    <label class="field">
+      <span>iBSS path inside IPSW</span>
+      <input bind:value={ibssIpswPath} placeholder="Firmware/dfu/iBSS.n41ap.RELEASE.im4p" />
+    </label>
+
+    <label class="field">
+      <span>iBEC path inside IPSW</span>
+      <input bind:value={ibecIpswPath} placeholder="Firmware/dfu/iBEC.n41ap.RELEASE.im4p" />
+    </label>
+
+    <label class="field">
+      <span>Kernel path inside IPSW</span>
+      <input bind:value={kernelIpswPath} placeholder="kernelcache.release.n41" />
+    </label>
+
+    <label class="field">
+      <span>Ramdisk path inside IPSW</span>
+      <input bind:value={ramdiskIpswPath} placeholder="058-12345-123.dmg" />
+    </label>
+
+    <label class="field">
+      <span>SHSH blob</span>
+      <input bind:value={shshPath} placeholder="/path/to/blob.shsh" />
+    </label>
+
+    <label class="field">
+      <span>SSH binaries directory</span>
+      <input bind:value={sshBinariesDir} placeholder="/path/to/ssh/binaries" />
+    </label>
+
+    <label class="field">
+      <span>Boot arguments</span>
+      <input bind:value={bootArgs} placeholder="rd=md0 -v amfi_get_out_of_my_way=0x1" />
+    </label>
+
+    <label class="field">
+      <span>Ramdisk target size (MB)</span>
+      <input type="number" bind:value={ramdiskTargetSizeMb} min="20" max="100" />
+    </label>
+
     <div class="actions">
-      <button class="primary" onclick={handleExtractAll} disabled={isWorking}>
-        Extract all
-      </button>
+      <button class="secondary" onclick={handleExtractAll} disabled={isWorking || !ipswPath || !outputDir}>Extract all</button>
     </div>
-    <ul class="paths">
-      <li><span>iBSS:</span><code>{extractedIbss || '—'}</code></li>
-      <li><span>iBEC:</span><code>{extractedIbec || '—'}</code></li>
-      <li><span>Kernel:</span><code>{extractedKernel || '—'}</code></li>
-      <li><span>Ramdisk:</span><code>{extractedRamdisk || '—'}</code></li>
-    </ul>
   </section>
 
   <section class="panel">
-    <div class="section-title">
-      <span>3</span>
-      <h2>Patch iBSS &amp; iBEC</h2>
-    </div>
-    <p class="panel-note">
-      Applies signature bypass and injects boot args. iBEC carries the boot args for the kernel.
-    </p>
+    <h2>Patch</h2>
+    <p>Patch the extracted components with your custom boot arguments.</p>
+
     <div class="actions">
-      <button class="secondary" onclick={handlePatchIboots} disabled={isWorking}>
-        Patch iBoot
-      </button>
+      <button class="secondary" onclick={handlePatchIboot} disabled={isWorking || !extractedIbss}>Patch iBSS</button>
+      <button class="secondary" onclick={handlePatchIbec} disabled={isWorking || !extractedIbec}>Patch iBEC</button>
+      <button class="secondary" onclick={handlePatchKernel} disabled={isWorking || !extractedKernel}>Patch kernel</button>
     </div>
-    <ul class="paths">
-      <li><span>iBSS:</span><code>{patchedIbss || '—'}</code></li>
-      <li><span>iBEC:</span><code>{patchedIbec || '—'}</code></li>
-    </ul>
   </section>
 
   <section class="panel">
-    <div class="section-title">
-      <span>4</span>
-      <h2>Patch Kernel</h2>
-    </div>
-    <p class="panel-note">Applies AMFI bypass (`-a`) and force-load (`-f`) flags.</p>
+    <h2>Repack</h2>
+    <p>Repack the patched components with your SHSH blob.</p>
+
     <div class="actions">
-      <button class="secondary" onclick={handlePatchKernel} disabled={isWorking}>
-        Patch kernel
-      </button>
+      <button class="secondary" onclick={handleRepackAll} disabled={isWorking || !patchedIbss || !shshPath}>Repack all</button>
     </div>
-    <ul class="paths">
-      <li><span>Kernel:</span><code>{patchedKernel || '—'}</code></li>
-    </ul>
   </section>
 
   <section class="panel">
-    <div class="section-title">
-      <span>5</span>
-      <h2>Modify Ramdisk</h2>
-    </div>
-    <div class="form-grid">
-      <label>
-        <span>Target Size (MB)</span>
-        <input type="number" min="10" bind:value={ramdiskTargetSizeMb} />
-      </label>
-      <label>
-        <span>SSH binaries directory</span>
-        <input bind:value={sshBinariesDir} placeholder="Folder with dropbear, authorized_keys, …" />
-      </label>
-    </div>
+    <h2>Ramdisk</h2>
+    <p>Inject SSH binaries into the ramdisk.</p>
+
     <div class="actions">
-      <button class="secondary" onclick={handleResizeRamdisk} disabled={isWorking}>Grow ramdisk</button>
-      <button class="secondary" onclick={handleInjectSshBinaries} disabled={isWorking}>Inject SSH binaries</button>
+      <button class="secondary" onclick={handleModifyRamdisk} disabled={isWorking || !extractedRamdisk || !sshBinariesDir}>Modify ramdisk</button>
     </div>
   </section>
 
   <section class="panel">
-    <div class="section-title">
-      <span>6</span>
-      <h2>Repack Components</h2>
-    </div>
-    <p class="panel-note">
-      Wraps patched iBSS/iBEC/kernel as {bitWidth === 'bits64' ? 'IMG4' : 'IMG3'}.
-      Required before kloader can hand them off to the device.
-    </p>
-    <div class="actions">
-      <button class="secondary" onclick={handleRepackAll} disabled={isWorking}>Repack all</button>
-    </div>
-  </section>
+    <h2>Boot</h2>
+    <p>Boot the device with kloader using the patched and repacked components.</p>
 
-  <section class="panel">
-    <div class="section-title">
-      <span>7</span>
-      <h2>Boot</h2>
-    </div>
-    <p class="panel-note">
-      Device must be in pwned DFU. Use the Jailbreak view to run gaster first if needed.
-    </p>
     <div class="actions">
       <button class="primary" onclick={handleBoot} disabled={isWorking || (mode !== 'DFU' && mode !== 'pwnDFU')}>
         kloader iBSS &rarr; iBEC
       </button>
     </div>
   </section>
+
+  {#if errorMessage}
+    <section class="panel error-panel">
+      <h2>Error</h2>
+      <p>{errorMessage}</p>
+    </section>
+  {/if}
 </div>
 
 <style>
   .view {
-    padding: var(--spacing-xl);
-    max-width: 860px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
   }
 
   .view-header {
-    margin-bottom: var(--spacing-lg);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
   }
 
   .view-header h1 {
-    color: var(--color-text-primary);
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 var(--spacing-xs);
-  }
-
-  .view-header p {
-    color: var(--color-text-secondary);
-    font-size: 0.9rem;
-    line-height: 1.5;
     margin: 0;
-  }
-
-  .device-summary {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1px;
-    overflow: hidden;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-border);
-    margin-bottom: var(--spacing-lg);
-  }
-
-  .device-summary div {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    background: var(--color-bg-secondary);
-    padding: var(--spacing-md);
-  }
-
-  .label {
-    color: var(--color-text-secondary);
-    font-size: 0.75rem;
-  }
-
-  .device-summary strong {
-    color: var(--color-text-primary);
-    font-size: 0.95rem;
-  }
-
-  .panel {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-secondary);
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-  }
-
-  .section-title {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
-  }
-
-  .section-title span {
-    display: inline-grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--color-accent);
-    color: white;
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-
-  .section-title h2 {
-    color: var(--color-text-primary);
-    font-size: 1rem;
-    margin: 0;
-  }
-
-  .panel-note {
-    color: var(--color-text-secondary);
-    font-size: 0.8rem;
-    line-height: 1.5;
-    margin: 0 0 var(--spacing-md);
-  }
-
-  .form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-  }
-
-  label {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-    color: var(--color-text-secondary);
-    font-size: 0.75rem;
+    font-size: 1.25rem;
     font-weight: 600;
   }
 
-  input {
-    width: 100%;
+  .view-header p {
+    margin: 0.25rem 0 0;
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .device-summary {
+    display: flex;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-sm);
+    background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
-    background: var(--color-bg-primary);
+  }
+
+  .device-summary .label {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .panel {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .panel h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .panel p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.8125rem;
+  }
+
+  .field span {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  .field input {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
     color: var(--color-text-primary);
-    font: inherit;
-    font-size: 0.85rem;
-    padding: 8px 10px;
+    padding: 6px 10px;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 0.8125rem;
+  }
+
+  .field input:disabled {
+    opacity: 0.6;
   }
 
   .actions {
     display: flex;
     gap: var(--spacing-sm);
-    justify-content: flex-end;
-    margin-bottom: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
   }
 
   button {
-    border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     font-size: 0.85rem;
     font-weight: 600;
-    padding: 8px 12px;
-  }
-
-  button.primary {
-    background: var(--color-accent);
-    border-color: var(--color-accent);
-    color: white;
-  }
-
-  button.secondary {
-    background: var(--color-bg-primary);
-    color: var(--color-text-primary);
+    padding: 8px 14px;
+    cursor: pointer;
+    border: 1px solid transparent;
   }
 
   button:disabled {
-    cursor: not-allowed;
     opacity: 0.5;
+    cursor: not-allowed;
   }
 
-  .paths {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .paths li {
-    display: flex;
-    gap: var(--spacing-sm);
-    align-items: baseline;
-    font-size: 0.78rem;
-    color: var(--color-text-secondary);
-  }
-
-  .paths li span {
-    flex-shrink: 0;
-    width: 70px;
+  .secondary {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
     color: var(--color-text-primary);
   }
 
-  .paths code {
-    color: var(--color-text-primary);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    overflow-wrap: anywhere;
+  .primary {
+    background: var(--color-accent);
+    border: 1px solid var(--color-accent);
+    color: white;
   }
 
-  .error-state {
-    border: 1px solid color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
-    border-radius: var(--radius-md);
-    background: var(--color-bg-secondary);
+  .error-panel {
+    background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+  }
+
+  .error-panel h2 {
     color: var(--color-danger);
-    font-size: 0.875rem;
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-  }
-
-  @media (max-width: 720px) {
-    .device-summary,
-    .form-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .actions {
-      justify-content: flex-start;
-    }
   }
 </style>

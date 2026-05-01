@@ -3,6 +3,7 @@ pub mod data;
 pub mod device;
 pub mod firmware;
 pub mod jailbreak;
+pub mod just_boot;
 pub mod restore;
 pub mod shsh;
 pub mod trollstore;
