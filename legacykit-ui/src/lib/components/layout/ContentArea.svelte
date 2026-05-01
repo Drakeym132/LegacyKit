@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Toolbar from './Toolbar.svelte';
   import StatusBar from './StatusBar.svelte';
   import ActionPanel from '../actions/ActionPanel.svelte';
   import Terminal from '../common/Terminal.svelte';
@@ -17,9 +16,7 @@
   import SettingsView from '$lib/views/SettingsView.svelte';
 </script>
 
-<main class="flex-1 flex flex-col h-screen bg-[var(--color-bg-primary)]">
-  <Toolbar />
-  
+<main class="flex-1 flex flex-col overflow-hidden bg-[var(--color-bg-primary)]">
   <div class="flex-1 overflow-hidden flex flex-col p-6">
     <div class="flex-1 flex justify-center overflow-y-auto mb-6">
       <div class="w-full max-w-[800px] flex flex-col gap-8">
