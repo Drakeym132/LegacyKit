@@ -39,7 +39,7 @@
 </script>
 
 <aside class="w-[240px] h-screen bg-[var(--color-bg-sidebar)] border-r border-[var(--color-border)] flex flex-col shrink-0 backdrop-blur-2xl" data-tauri-drag-region>
-  <div class="flex flex-col h-full px-3 pt-12 pb-3">
+  <div class="flex flex-col h-full px-3 pt-3 pb-3">
     <DeviceCard />
 
     <nav class="mt-3 flex-1 overflow-y-auto -mx-1 px-1">
