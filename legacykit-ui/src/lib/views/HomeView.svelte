@@ -584,6 +584,3 @@
       width: 100%;
       height: 1px;
       align-self: auto;
-    }
-  }
-</style>
