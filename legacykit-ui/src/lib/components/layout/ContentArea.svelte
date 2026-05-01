@@ -1,8 +1,6 @@
 <script lang="ts">
-  import StatusBar from './StatusBar.svelte';
-  import Terminal from '../common/Terminal.svelte';
+  import TerminalDeck from './TerminalDeck.svelte';
   import { navigationStore } from '$lib/stores/navigationStore.svelte';
-  import { settingsStore } from '$lib/stores/settingsStore.svelte';
 
   import HomeView from '$lib/views/HomeView.svelte';
   import RestoreView from '$lib/views/RestoreView.svelte';
@@ -17,7 +15,7 @@
 
 <main class="flex-1 flex flex-col overflow-hidden bg-[var(--color-bg-primary)]">
   <div class="flex-1 overflow-hidden flex flex-col p-6">
-    <div class="flex-1 overflow-auto mb-6">
+    <div class="flex-1 overflow-auto">
       <div class="w-full h-full flex flex-col gap-8">
         {#if navigationStore.currentView === 'home'}
           <HomeView />
@@ -40,13 +38,7 @@
         {/if}
       </div>
     </div>
-    
-    {#if settingsStore.terminalVisible}
-      <div class="shrink-0" style={`height: ${settingsStore.terminalHeight}px`}>
-        <Terminal />
-      </div>
-    {/if}
   </div>
-  
-  <StatusBar />
+
+  <TerminalDeck />
 </main>

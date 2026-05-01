@@ -67,6 +67,10 @@
     </div>
 
     <div class="title-right">
+      <div class="device-status" title={isConnected ? 'Device Connected' : 'No device'}>
+        <span class="device-dot" class:connected={isConnected}></span>
+        <span class="device-label">{isConnected ? 'Connected' : 'Ready'}</span>
+      </div>
       {#if !isMacOS}
         <button class="window-control" onclick={minimize} aria-label="Minimize">
           <svg width="10" height="1" viewBox="0 0 10 1">
@@ -255,6 +259,34 @@
   }
 
   .titlebar.macos .title-right {
-    min-width: 70px;
+    min-width: 140px;
+    padding-right: 8px;
+  }
+
+  .device-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    -webkit-app-region: no-drag;
+  }
+
+  .device-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--color-text-secondary);
+    opacity: 0.6;
+  }
+
+  .device-dot.connected {
+    background: var(--color-success);
+    opacity: 1;
+  }
+
+  .device-label {
+    line-height: 1;
   }
 </style>

@@ -1,6 +1,6 @@
 class SettingsStore {
   theme = $state<'system' | 'light' | 'dark'>('system');
-  terminalVisible = $state<boolean>(true);
+  terminalVisible = $state<boolean>(false);
   terminalHeight = $state<number>(200);
   autoDetectDevice = $state<boolean>(true);
   pollIntervalMs = $state<number>(3000);
