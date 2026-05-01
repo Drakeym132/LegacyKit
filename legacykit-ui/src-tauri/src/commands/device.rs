@@ -28,6 +28,24 @@ pub async fn detect_device(app: tauri::AppHandle) -> Result<DeviceInfo, AppError
                             "HardwareModel" => info.model = Some(value),
                             "ProductVersion" => info.ios_version = Some(value),
                             "UniqueChipID" => info.ecid = Some(value),
+                            "BuildVersion" => info.build_version = Some(value),
+                            "CPUArchitecture" => info.cpu_architecture = Some(value),
+                            "HardwarePlatform" => info.hardware_platform = Some(value),
+                            "DeviceColor" => info.device_color = Some(value),
+                            "DeviceClass" => info.device_class = Some(value),
+                            "ModelNumber" => info.model_number = Some(value),
+                            "RegionInfo" => info.region_info = Some(value),
+                            "ActivationState" => info.activation_state = Some(value),
+                            "BasebandVersion" => info.baseband_version = Some(value),
+                            "FirmwareVersion" => info.firmware_version = Some(value),
+                            "TotalDiskCapacity" => info.total_disk_capacity = value.parse().ok(),
+                            "TotalDataAvailable" => info.total_data_available = value.parse().ok(),
+                            "BatteryCurrentCapacity" => info.battery_current_capacity = value.parse().ok(),
+                            "PasswordProtected" => info.password_protected = Some(value == "true"),
+                            "TelephonyCapability" => info.telephony_capability = Some(value == "true"),
+                            "InternationalMobileEquipmentIdentity" => info.imei = Some(value),
+                            "WiFiAddress" => info.wifi_address = Some(value),
+                            "BluetoothAddress" => info.bluetooth_address = Some(value),
                             _ => {}
                         }
                     }
@@ -65,6 +83,12 @@ pub async fn detect_device(app: tauri::AppHandle) -> Result<DeviceInfo, AppError
                                     _ => DeviceMode::Recovery,
                                 };
                             }
+                            "CPID" => info.cpid = Some(value),
+                            "CPRV" => info.cprv = Some(value),
+                            "BDID" => info.bdid = Some(value),
+                            "IBFL" => info.ibfl = Some(value),
+                            "NONC" => info.apnonce = Some(value),
+                            "SNON" => info.sepnonce = Some(value),
                             _ => {}
                         }
                     }

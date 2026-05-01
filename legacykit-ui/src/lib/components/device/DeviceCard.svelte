@@ -4,9 +4,16 @@
 
   let isConnected = $derived(deviceStore.state.connected);
   let deviceName = $derived(deviceStore.state.name || 'Unknown Device');
-  let deviceIdentifier = $derived(deviceStore.state.product_type || deviceStore.state.model || deviceStore.state.udid || 'Unknown Device');
+  let deviceIdentifier = $derived(
+    deviceStore.state.device_class
+      ? `${deviceStore.state.device_class} · ${deviceStore.state.product_type || deviceStore.state.model || deviceStore.state.udid || 'Unknown Device'}`
+      : (deviceStore.state.product_type || deviceStore.state.model || deviceStore.state.udid || 'Unknown Device')
+  );
   let iosVersion = $derived(deviceStore.state.ios_version || 'Unknown');
   let deviceMode = $derived(deviceStore.state.mode);
+  let batteryCapacity = $derived(deviceStore.state.battery_current_capacity);
+  let activationState = $derived(deviceStore.state.activation_state || '');
+  let cpid = $derived(deviceStore.state.cpid || '');
 </script>
 
 <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-3 mb-6 shadow-sm transition-all duration-200 {isConnected ? 'ring-1 ring-[var(--color-accent)] ring-opacity-30' : ''}">
@@ -25,16 +32,43 @@
 
   {#if isConnected}
     <div class="mt-3 pt-3 border-t border-[var(--color-border)]">
-      <div class="flex justify-between items-center text-[12px] mb-1">
-        <span class="text-[var(--color-text-secondary)]">iOS</span>
-        <span class="font-medium text-[var(--color-text-primary)]">{iosVersion}</span>
-      </div>
-      <div class="flex justify-between items-center text-[12px]">
-        <span class="text-[var(--color-text-secondary)]">Mode</span>
-        <span class="font-medium text-[var(--color-text-primary)]">
-          <DeviceStatus mode={deviceMode} />
-        </span>
-      </div>
+      {#if deviceMode === 'Normal'}
+        <div class="flex justify-between items-center text-[12px] mb-1">
+          <span class="text-[var(--color-text-secondary)]">iOS</span>
+          <span class="font-medium text-[var(--color-text-primary)]">{iosVersion}</span>
+        </div>
+        <div class="flex justify-between items-center text-[12px] mb-1">
+          <span class="text-[var(--color-text-secondary)]">Mode</span>
+          <span class="font-medium text-[var(--color-text-primary)]">
+            <DeviceStatus mode={deviceMode} />
+          </span>
+        </div>
+        {#if batteryCapacity != null}
+          <div class="flex justify-between items-center text-[12px] mb-1">
+            <span class="text-[var(--color-text-secondary)]">Battery</span>
+            <span class="font-medium text-[var(--color-text-primary)]">{batteryCapacity}%</span>
+          </div>
+        {/if}
+        {#if activationState}
+          <div class="flex justify-between items-center text-[12px]">
+            <span class="text-[var(--color-text-secondary)]">Activation</span>
+            <span class="font-medium text-[var(--color-text-primary)]">{activationState}</span>
+          </div>
+        {/if}
+      {:else}
+        <div class="flex justify-between items-center text-[12px] mb-1">
+          <span class="text-[var(--color-text-secondary)]">Mode</span>
+          <span class="font-medium text-[var(--color-text-primary)]">
+            <DeviceStatus mode={deviceMode} />
+          </span>
+        </div>
+        {#if cpid}
+          <div class="flex justify-between items-center text-[12px]">
+            <span class="text-[var(--color-text-secondary)]">CPID</span>
+            <span class="font-medium text-[var(--color-text-primary)]">{cpid}</span>
+          </div>
+        {/if}
+      {/if}
     </div>
   {/if}
 </div>

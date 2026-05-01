@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Toolbar from './lib/components/layout/Toolbar.svelte';
   import Sidebar from './lib/components/layout/Sidebar.svelte';
   import ContentArea from './lib/components/layout/ContentArea.svelte';
   import Toaster from './lib/components/common/Toaster.svelte';
@@ -81,8 +82,11 @@
   }
 </script>
 
-<div class="flex h-screen w-screen overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
-  <Sidebar />
-  <ContentArea />
+<div class="flex flex-col h-screen w-screen overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
+  <Toolbar />
+  <div class="flex flex-1 overflow-hidden">
+    <Sidebar />
+    <ContentArea />
+  </div>
 </div>
 <Toaster />

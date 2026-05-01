@@ -1,6 +1,5 @@
 <script lang="ts">
   import StatusBar from './StatusBar.svelte';
-  import ActionPanel from '../actions/ActionPanel.svelte';
   import Terminal from '../common/Terminal.svelte';
   import { navigationStore } from '$lib/stores/navigationStore.svelte';
   import { settingsStore } from '$lib/stores/settingsStore.svelte';
@@ -18,8 +17,8 @@
 
 <main class="flex-1 flex flex-col overflow-hidden bg-[var(--color-bg-primary)]">
   <div class="flex-1 overflow-hidden flex flex-col p-6">
-    <div class="flex-1 flex justify-center overflow-y-auto mb-6">
-      <div class="w-full max-w-[800px] flex flex-col gap-8">
+    <div class="flex-1 overflow-auto mb-6">
+      <div class="w-full h-full flex flex-col gap-8">
         {#if navigationStore.currentView === 'home'}
           <HomeView />
         {:else if navigationStore.currentView === 'restore'}

@@ -38,11 +38,13 @@
   ];
 </script>
 
-<aside class="w-[240px] h-screen bg-[var(--color-bg-sidebar)] border-r border-[var(--color-border)] flex flex-col shrink-0 backdrop-blur-2xl" data-tauri-drag-region>
+<aside class="w-[240px] h-full bg-[var(--color-bg-sidebar)] border-r border-[var(--color-border)] flex flex-col shrink-0 backdrop-blur-2xl">
   <div class="flex flex-col h-full px-3 pt-3 pb-3">
-    <DeviceCard />
+    {#if navigationStore.currentView !== 'home'}
+      <DeviceCard />
+    {/if}
 
-    <nav class="mt-3 flex-1 overflow-y-auto -mx-1 px-1">
+    <nav class="{navigationStore.currentView === 'home' ? '' : 'mt-3 '}flex-1 overflow-y-auto -mx-1 px-1">
       {#each sections as section, i}
         {#if section.title}
           <div class="px-3 {i === 0 ? 'pt-1' : 'pt-4'} pb-1 text-[11px] font-medium text-[var(--color-text-secondary)]">
