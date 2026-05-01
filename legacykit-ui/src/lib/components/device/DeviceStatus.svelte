@@ -1,16 +1,23 @@
 <script lang="ts">
-  let { mode = 'Normal' }: { mode?: 'Normal' | 'Recovery' | 'DFU' | 'kDFU' | 'pwnDFU' | 'WTF' } = $props();
+  let {
+    mode = 'Normal',
+    connected = true,
+  }: {
+    mode?: 'Normal' | 'Recovery' | 'DFU' | 'kDFU' | 'pwnDFU' | 'WTF';
+    connected?: boolean;
+  } = $props();
 
-  // Determine status color based on mode
-  let statusColor = $derived(getStatusColor(mode));
+  let statusColor = $derived(connected ? getStatusColor(mode) : 'var(--color-danger)');
+  let label = $derived(connected ? `Connected · ${mode}` : 'Disconnected');
 
   function getStatusColor(m: string): string {
     switch(m) {
       case 'Normal': return 'var(--color-success)';
-      case 'Recovery': return 'var(--color-warning)';
-      case 'DFU': 
-      case 'kDFU': 
-      case 'pwnDFU': return 'var(--color-danger)';
+      case 'Recovery':
+      case 'DFU':
+      case 'kDFU':
+      case 'pwnDFU':
+      case 'WTF': return '#AF52DE';
       default: return 'var(--color-text-secondary)';
     }
   }
@@ -18,7 +25,7 @@
 
 <div class="status-indicator">
   <span class="dot" style="background-color: {statusColor}"></span>
-  <span class="mode-text">{mode}</span>
+  <span class="mode-text">{label}</span>
 </div>
 
 <style>
@@ -27,7 +34,7 @@
     align-items: center;
     gap: 6px;
     background-color: var(--color-bg-secondary);
-    padding: 2px 6px;
+    padding: 2px 8px;
     border-radius: 10px;
   }
 

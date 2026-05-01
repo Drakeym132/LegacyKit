@@ -1,6 +1,57 @@
 <script lang="ts">
   import { deviceStore } from '../stores/deviceStore.svelte';
+  import { navigationStore } from '../stores/navigationStore.svelte';
+  import type { ViewName } from '../stores/navigationStore.svelte';
   import DeviceStatus from '../components/device/DeviceStatus.svelte';
+  import DeviceImage from '../components/device/DeviceImage.svelte';
+  import JustBootDialog from '../components/device/JustBootDialog.svelte';
+  import { getDeviceFriendlyName } from '../utils/deviceModels';
+
+  let showJustBoot = $state(false);
+
+  type QuickAction =
+    | { kind: 'nav'; label: string; view: ViewName; icon: string }
+    | { kind: 'just-boot'; label: string; icon: string };
+
+  const quickActions: QuickAction[] = [
+    {
+      kind: 'nav',
+      label: 'Restore',
+      view: 'restore',
+      icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`,
+    },
+    {
+      kind: 'nav',
+      label: 'Jailbreak',
+      view: 'jailbreak',
+      icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>`,
+    },
+    {
+      kind: 'nav',
+      label: 'SHSH Blobs',
+      view: 'shsh',
+      icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>`,
+    },
+    {
+      kind: 'nav',
+      label: 'SSH Ramdisk',
+      view: 'ssh-ramdisk',
+      icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
+    },
+    {
+      kind: 'just-boot',
+      label: 'Just Boot',
+      icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>`,
+    },
+  ];
+
+  function handleAction(action: QuickAction) {
+    if (action.kind === 'nav') {
+      navigationStore.navigate(action.view);
+    } else {
+      showJustBoot = true;
+    }
+  }
 
   function formatBytes(bytes: number): string {
     const gb = bytes / (1024 * 1024 * 1024);
@@ -13,7 +64,12 @@
   }
 
   let isConnected = $derived(deviceStore.state.connected);
-  let deviceName = $derived(deviceStore.state.name ?? 'Unknown Device');
+  let deviceName = $derived(
+    deviceStore.state.name
+      ?? getDeviceFriendlyName(deviceStore.state.product_type)
+      ?? deviceStore.state.product_type
+      ?? 'Unknown Device'
+  );
   let productType = $derived(deviceStore.state.product_type ?? '—');
   let deviceMode = $derived(deviceStore.state.mode);
   let isNormalMode = $derived(deviceMode === 'Normal');
@@ -90,41 +146,36 @@
     <div class="info-pane">
       <header class="info-header">
         <div class="device-image">
-          <svg width="80" height="166" viewBox="0 0 96 200" fill="none">
-            <rect x="1" y="1" width="94" height="198" rx="15" fill="#1c2b4a" />
-            <rect x="3" y="3" width="90" height="194" rx="13" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
-            <rect x="7" y="30" width="82" height="140" rx="5" fill="#dbeafe" />
-            <rect x="7" y="30" width="82" height="140" rx="5" fill="url(#sg)" />
-            <defs>
-              <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="white" stop-opacity="0.18" />
-                <stop offset="100%" stop-color="white" stop-opacity="0" />
-              </linearGradient>
-            </defs>
-            <circle cx="48" cy="185" r="8" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
-            <circle cx="48" cy="185" r="4" fill="rgba(255,255,255,0.06)" />
-            <circle cx="48" cy="18" r="3.5" fill="rgba(255,255,255,0.12)" />
-            {#each [37, 41, 45, 49, 53, 57, 61] as x}
-              <rect {x} y="16" width="2" height="4" rx="1" fill="rgba(255,255,255,0.1)" />
-            {/each}
-            <rect x="15" y="46" width="66" height="10" rx="3" fill="rgba(79,142,247,0.3)" />
-            <rect x="15" y="62" width="46" height="5" rx="2" fill="rgba(79,142,247,0.15)" />
-            <rect x="15" y="73" width="56" height="5" rx="2" fill="rgba(79,142,247,0.1)" />
-            <rect x="15" y="84" width="38" height="5" rx="2" fill="rgba(79,142,247,0.08)" />
-            {#each [15, 37, 59] as x}
-              <rect {x} y="100" width="18" height="18" rx="4" fill="rgba(79,142,247,0.12)" />
-            {/each}
-          </svg>
+          <DeviceImage
+            productType={deviceStore.state.product_type}
+            deviceColor={deviceStore.state.device_color}
+          />
         </div>
 
         <div class="header-text">
           <h1 class="device-name">{deviceName}</h1>
-          <div class="device-product">{productType}</div>
           <div class="device-status-wrap">
-            <DeviceStatus mode={deviceMode} />
+            <DeviceStatus mode={deviceMode} connected={isConnected} />
           </div>
         </div>
       </header>
+
+      <nav class="quick-actions" aria-label="Quick actions">
+        {#each quickActions as action}
+          <button
+            class="quick-action"
+            onclick={() => handleAction(action)}
+            aria-label={action.label}
+            title={action.label}
+          >
+            <span class="action-icon">
+              <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+              {@html action.icon}
+            </span>
+            <span class="action-label">{action.label}</span>
+          </button>
+        {/each}
+      </nav>
 
       {#if isNormalMode}
         <section class="info-section">
@@ -211,6 +262,8 @@
   {/if}
 </div>
 
+<JustBootDialog open={showJustBoot} onClose={() => (showJustBoot = false)} />
+
 <style>
   .home-view {
     display: flex;
@@ -234,17 +287,21 @@
   .info-header {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 32px;
     padding-bottom: var(--spacing-md);
   }
 
   .device-image {
+    position: relative;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     width: 96px;
-    height: 166px;
+    height: 168px;
+    margin-bottom: 24px;
+    overflow: visible;
   }
 
   .header-text {
@@ -255,7 +312,7 @@
   }
 
   .device-name {
-    font-size: 1.625rem;
+    font-size: 1.875rem;
     font-weight: 600;
     color: var(--color-text-primary);
     margin: 0;
@@ -264,14 +321,74 @@
     letter-spacing: -0.01em;
   }
 
-  .device-product {
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-    font-weight: 500;
+  .device-status-wrap {
+    margin-top: 6px;
   }
 
-  .device-status-wrap {
-    margin-top: 4px;
+  .device-status-wrap :global(.status-indicator) {
+    padding: 4px 11px;
+    border-radius: 12px;
+    gap: 7px;
+  }
+
+  .device-status-wrap :global(.dot) {
+    width: 7px;
+    height: 7px;
+  }
+
+  .device-status-wrap :global(.mode-text) {
+    font-size: 13px;
+  }
+
+  /* ── Quick actions ── */
+  .quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding: 4px 0 var(--spacing-sm);
+  }
+
+  .quick-action {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 76px;
+    height: 56px;
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--color-text-primary);
+    transition: background-color 0.1s ease, border-color 0.1s ease, opacity 0.1s ease;
+  }
+
+  .quick-action:hover {
+    background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+  }
+
+  .quick-action:active {
+    background: var(--color-bg-secondary);
+  }
+
+  .action-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-primary);
+    opacity: 0.85;
+  }
+
+  .action-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    letter-spacing: 0.01em;
+    line-height: 1;
   }
 
   /* ── Info sections ── */

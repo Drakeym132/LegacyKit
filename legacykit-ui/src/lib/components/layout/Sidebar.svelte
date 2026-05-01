@@ -40,7 +40,8 @@
 </script>
 
 <aside class="w-[240px] h-full bg-[var(--color-bg-sidebar)] border-r border-[var(--color-border)] flex flex-col shrink-0 backdrop-blur-2xl">
-  <div class="flex flex-col h-full px-3 pt-3 pb-3">
+  <div class="h-7 shrink-0" data-tauri-drag-region></div>
+  <div class="flex flex-col flex-1 min-h-0 px-3 pb-3">
     <nav class="flex-1 overflow-y-auto -mx-1 px-1">
       {#each sections as section, i}
         {#if section.title}

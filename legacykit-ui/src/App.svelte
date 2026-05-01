@@ -82,10 +82,10 @@
   }
 </script>
 
-<div class="flex flex-col h-screen w-screen overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
-  <Toolbar />
-  <div class="flex flex-1 overflow-hidden">
-    <Sidebar />
+<div class="flex h-screen w-screen overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
+  <Sidebar />
+  <div class="flex flex-col flex-1 overflow-hidden">
+    <Toolbar />
     <ContentArea />
   </div>
 </div>
