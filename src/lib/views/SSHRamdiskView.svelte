@@ -7,12 +7,12 @@
     patchKernel,
     repackImg3,
     type IbootBitWidth,
-  } from '../../api/firmware';
-  import { runKloader } from '../../api/jailbreak';
-  import { recordJustBoot } from '../../api/justBoot';
-  import { deviceStore } from '../../stores/deviceStore.svelte';
-  import { logStore } from '../../stores/logStore.svelte';
-  import { toastStore } from '../../stores/toastStore.svelte';
+  } from '$lib/api/firmware';
+  import { runKloader } from '$lib/api/jailbreak';
+  import { recordJustBoot } from '$lib/api/justBoot';
+  import { deviceStore } from '$lib/stores/deviceStore.svelte';
+  import { logStore } from '$lib/stores/logStore.svelte';
+  import { toastStore } from '$lib/stores/toastStore.svelte';
 
   let ipswPath = $state('');
   let outputDir = $state('');
@@ -108,7 +108,14 @@
       return;
     }
     const result = await withWorking('Patch iBSS', async () => {
-      const patched = await patchIboot({ inputPath: extractedIbss, bootArgs, bitWidth });
+      const patched = await patchIboot({
+        inputPath: extractedIbss,
+        outputPath: joinOut('iBSS.patched.bin'),
+        bitWidth,
+        bootArgs: null,
+        bypassRsa: true,
+        debug: false,
+      });
       patchedIbss = patched.outputPath;
     });
     if (!result) return;
@@ -120,7 +127,14 @@
       return;
     }
     const result = await withWorking('Patch iBEC', async () => {
-      const patched = await patchIboot({ inputPath: extractedIbec, bootArgs, bitWidth });
+      const patched = await patchIboot({
+        inputPath: extractedIbec,
+        outputPath: joinOut('iBEC.patched.bin'),
+        bitWidth,
+        bootArgs: bootArgs || null,
+        bypassRsa: true,
+        debug: false,
+      });
       patchedIbec = patched.outputPath;
     });
     if (!result) return;
@@ -132,7 +146,12 @@
       return;
     }
     const result = await withWorking('Patch kernel', async () => {
-      const patched = await patchKernel({ inputPath: extractedKernel });
+      const patched = await patchKernel({
+        inputPath: extractedKernel,
+        outputPath: joinOut('kernelcache.patched.bin'),
+        bitWidth,
+        flags: ['-a', '-f'],
+      });
       patchedKernel = patched.outputPath;
     });
     if (!result) return;
@@ -145,10 +164,10 @@
     }
     const result = await withWorking(`Repack ${component}`, async () => {
       if (processorGen !== null && processorGen >= 7) {
-        const repacked = await packImg4({ inputPath, shshPath, outputPath: joinOut(outputName) });
+        const repacked = await packImg4({ im4pPath: inputPath, shshPath, outputPath: joinOut(outputName), im4mPath: null });
         return repacked.outputPath;
       } else {
-        const repacked = await repackImg3({ inputPath, shshPath, outputPath: joinOut(outputName) });
+        const repacked = await repackImg3({ inputPath, outputPath: joinOut(outputName), templatePath: null, key: null, iv: null });
         return repacked.outputPath;
       }
     });
@@ -181,11 +200,12 @@
     const result = await withWorking('Modify ramdisk', async () => {
       const modified = await modifyRamdisk({
         ramdiskPath: extractedRamdisk,
-        sshBinariesDir,
-        targetSizeMb: ramdiskTargetSizeMb,
-        outputPath: joinOut('ramdisk.modified.dmg'),
+        action: 'resize',
+        sourcePath: null,
+        targetPath: null,
+        sizeMb: ramdiskTargetSizeMb,
       });
-      extractedRamdisk = modified.outputPath;
+      extractedRamdisk = modified.ramdiskPath;
     });
     if (!result) return;
   }

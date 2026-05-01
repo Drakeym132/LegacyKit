@@ -137,8 +137,8 @@
 | File | Action | Description |
 |------|--------|-------------|
 | `.github/workflows/release.yml` | Modified | Added `ubuntu-22.04-arm` matrix entry for Linux ARM64 builds; broadened the apt-install step to all `ubuntu-*` runners |
-| `legacykit-ui/docs/USER-GUIDE.md` | Created | End-user installation, view-by-view tour, troubleshooting matrix |
-| `legacykit-ui/docs/MIGRATION-FROM-BASH.md` | Created | Mapping from `restore.sh` menus to UI, shared `saved/` layout, behavioral differences, deferred items |
+| `docs/USER-GUIDE.md` | Created | End-user installation, view-by-view tour, troubleshooting matrix |
+| `docs/MIGRATION-FROM-BASH.md` | Created | Mapping from `restore.sh` menus to UI, shared `saved/` layout, behavioral differences, deferred items |
 
 ### Phase 3: Restore & Downgrade (Complete)
 
@@ -220,8 +220,8 @@
 - [x] Resource bundling
 - [x] CI/CD pipeline (GitHub Actions)
 - [x] Linux ARM64 CI/CD target (`ubuntu-22.04-arm` runner added to release.yml matrix)
-- [x] User documentation (`legacykit-ui/docs/USER-GUIDE.md`)
-- [x] Migration guide from bash script (`legacykit-ui/docs/MIGRATION-FROM-BASH.md`)
+- [x] User documentation (`docs/USER-GUIDE.md`)
+- [x] Migration guide from bash script (`docs/MIGRATION-FROM-BASH.md`)
 
 ### Backend Infrastructure (Ongoing)
 - [x] Command modules — `device`, `restore`, `jailbreak`, `firmware`, `shsh`, `apps`, `data`, `utilities`, `trollstore`, `updates`

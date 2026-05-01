@@ -28,3 +28,15 @@ version.xml
 index.html
 sha1sum
 url
+
+# --- frontend (Vite/Svelte/Tauri UI) ---
+node_modules
+dist
+dist-ssr
+*.local
+*.log
+npm-debug.log*
+
+# --- Rust (Tauri backend) ---
+/src-tauri/target/
+/src-tauri/gen/schemas

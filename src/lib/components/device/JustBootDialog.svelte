@@ -117,7 +117,7 @@
         filters: [{ name: 'IPSW', extensions: ['ipsw'] }]
       });
       if (selected) {
-        ipswPath = selected;
+        ipswPath = selected as string;
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);

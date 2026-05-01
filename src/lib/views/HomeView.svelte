@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { navigationStore } from '../stores/navigationStore.svelte';
+  import { navigationStore, type ViewName } from '../stores/navigationStore.svelte';
   import { deviceStore } from '../stores/deviceStore.svelte';
   import { settingsStore } from '../stores/settingsStore.svelte';
   import { listJustBootHistory, type JustBootEntry } from '../api/justBoot';
@@ -83,7 +83,7 @@
 
   // Derived state
   let isNormalMode = $derived(deviceStore.state.mode === 'Normal');
-  let modelNumber = $derived(deviceStore.state.hardware_model || '—');
+  let modelNumber = $derived(deviceStore.state.model || '—');
   let model = $derived(getDeviceFriendlyName(deviceStore.state.product_type) || deviceStore.state.product_type || 'Unknown');
   let capacityLabel = $derived(
     deviceStore.state.total_disk_capacity
@@ -125,7 +125,7 @@
 
 <div class="view">
   <div class="view-header">
-    <DeviceImage productType={deviceStore.state.product_type} />
+    <DeviceImage productType={deviceStore.state.product_type} deviceColor={deviceStore.state.device_color} />
     <div class="device-info">
       <h1>{deviceStore.state.name || getDeviceFriendlyName(deviceStore.state.product_type) || 'Legacy Device'}</h1>
       <p>{deviceStore.state.ios_version || 'Unknown iOS'} • {deviceStore.state.mode || 'Unknown Mode'}</p>
@@ -178,11 +178,11 @@
         <dl class="info-rows">
           <div class="info-row">
             <dt>LegacyKit</dt>
-            <dd>{settingsStore.state.appVersion}</dd>
+            <dd>{"0.0.0"}</dd>
           </div>
           <div class="info-row">
             <dt>Platform</dt>
-            <dd>{settingsStore.state.platform}</dd>
+            <dd>{"Unknown"}</dd>
           </div>
         </dl>
       </section>
