@@ -99,10 +99,10 @@
 </script>
 
 <div class="home-view">
-  <div class="unified-pane">
-    <!-- Left: Device Details -->
-    <div class="device-side">
-      {#if isConnected}
+  <!-- Hero card: device identity + compact action toolbar -->
+  <section class="hero-card">
+    {#if isConnected}
+      <div class="hero-device">
         <div class="device-illustration">
           <svg viewBox="0 0 120 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="device-svg">
             <rect x="10" y="4" width="100" height="192" rx="18" stroke="currentColor" stroke-width="2.5" opacity="0.35" />
@@ -112,185 +112,27 @@
             <circle cx="60" cy="14" r="2" fill="currentColor" opacity="0.15" />
           </svg>
         </div>
-
-        <div class="device-headline">
+        <div class="hero-text">
           <h2 class="device-name">{deviceName}</h2>
           <span class="device-product">{productType}</span>
           <DeviceStatus mode={deviceMode} />
         </div>
+      </div>
 
-        <div class="device-details">
-          {#if isNormalMode}
-            {#if hasIdentity}
-              <div class="detail-section">
-                <div class="section-label">Identity</div>
-                <div class="detail-row">
-                  <span class="detail-label">Device Class</span>
-                  <span class="detail-value">{deviceClass}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Model</span>
-                  <span class="detail-value">{model}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Model Number</span>
-                  <span class="detail-value">{modelNumber}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Region</span>
-                  <span class="detail-value">{regionInfo}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Color</span>
-                  <span class="detail-value">{deviceColor}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Serial</span>
-                  <span class="detail-value mono">{serial}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">UDID</span>
-                  <span class="detail-value mono">{udid}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">ECID</span>
-                  <span class="detail-value mono">{ecid}</span>
-                </div>
-              </div>
-            {/if}
-
-            {#if hasSoftware}
-              <div class="detail-section">
-                <div class="section-label">Software</div>
-                <div class="detail-row">
-                  <span class="detail-label">iOS</span>
-                  <span class="detail-value">{iosVersion}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Build</span>
-                  <span class="detail-value">{buildVersion}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Firmware</span>
-                  <span class="detail-value">{firmwareVersion}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Baseband</span>
-                  <span class="detail-value">{basebandVersion}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Activation</span>
-                  <span class="detail-value">{activationState}</span>
-                </div>
-              </div>
-            {/if}
-
-            {#if hasHardware}
-              <div class="detail-section">
-                <div class="section-label">Hardware</div>
-                <div class="detail-row">
-                  <span class="detail-label">CPU Architecture</span>
-                  <span class="detail-value">{cpuArchitecture}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Platform</span>
-                  <span class="detail-value">{hardwarePlatform}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Battery</span>
-                  <span class="detail-value">{batteryCapacity}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Storage</span>
-                  <span class="detail-value">{totalDisk}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Available</span>
-                  <span class="detail-value">{totalAvailable}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Passcode</span>
-                  <span class="detail-value">{passwordProtected}</span>
-                </div>
-              </div>
-            {/if}
-
-            {#if hasNetwork}
-              <div class="detail-section">
-                <div class="section-label">Network</div>
-                <div class="detail-row">
-                  <span class="detail-label">Cellular</span>
-                  <span class="detail-value">{telephonyCapability}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">IMEI</span>
-                  <span class="detail-value mono">{imei}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">WiFi MAC</span>
-                  <span class="detail-value mono">{wifiAddress}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Bluetooth MAC</span>
-                  <span class="detail-value mono">{bluetoothAddress}</span>
-                </div>
-              </div>
-            {/if}
-          {:else}
-            {#if hasRecoveryInfo}
-              <div class="detail-section">
-                <div class="section-label">Recovery Info</div>
-                <div class="detail-row">
-                  <span class="detail-label">ECID</span>
-                  <span class="detail-value mono">{ecid}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Serial</span>
-                  <span class="detail-value mono">{serial}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Model</span>
-                  <span class="detail-value">{model}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Product</span>
-                  <span class="detail-value">{productType}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">CPID</span>
-                  <span class="detail-value mono">{cpid}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">CPRV</span>
-                  <span class="detail-value mono">{cprv}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Board ID</span>
-                  <span class="detail-value mono">{bdid}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">iBoot Flags</span>
-                  <span class="detail-value mono">{ibfl}</span>
-                </div>
-              </div>
-            {/if}
-
-            {#if hasNonces}
-              <div class="detail-section">
-                <div class="section-label">Nonces</div>
-                <div class="detail-row">
-                  <span class="detail-label">APNonce</span>
-                  <span class="detail-value mono">{apnonce}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">SEPNonce</span>
-                  <span class="detail-value mono">{sepnonce}</span>
-                </div>
-              </div>
-            {/if}
-          {/if}
-        </div>
-      {:else}
+      <div class="action-toolbar" role="toolbar" aria-label="Quick actions">
+        {#each quickActions as action}
+          <button
+            class="action-tile"
+            onclick={() => navigationStore.navigate(action.view)}
+            title={action.description}
+          >
+            <span class="action-icon" aria-hidden="true">{action.icon}</span>
+            <span class="action-label">{action.label}</span>
+          </button>
+        {/each}
+      </div>
+    {:else}
+      <div class="hero-device">
         <div class="device-illustration disconnected">
           <svg viewBox="0 0 120 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="device-svg">
             <rect x="10" y="4" width="100" height="192" rx="18" stroke="currentColor" stroke-width="2.5" opacity="0.15" stroke-dasharray="6 4" />
@@ -299,73 +141,138 @@
             <rect x="44" y="14" width="32" height="4" rx="2" fill="currentColor" opacity="0.08" />
           </svg>
         </div>
-        <div class="device-headline">
+        <div class="hero-text">
           <h2 class="device-name muted">No Device Connected</h2>
           <span class="device-product muted">Connect a USB device to get started</span>
         </div>
+      </div>
+    {/if}
+  </section>
+
+  <!-- Detail grid: each section is its own card -->
+  {#if isConnected}
+    <div class="detail-grid">
+      {#if isNormalMode}
+        {#if hasIdentity}
+          <section class="detail-card">
+            <h3 class="card-title">Identity</h3>
+            <dl class="detail-list">
+              <div class="detail-row"><dt>Device Class</dt><dd>{deviceClass}</dd></div>
+              <div class="detail-row"><dt>Model</dt><dd>{model}</dd></div>
+              <div class="detail-row"><dt>Model Number</dt><dd>{modelNumber}</dd></div>
+              <div class="detail-row"><dt>Region</dt><dd>{regionInfo}</dd></div>
+              <div class="detail-row"><dt>Color</dt><dd>{deviceColor}</dd></div>
+              <div class="detail-row"><dt>Serial</dt><dd class="mono">{serial}</dd></div>
+              <div class="detail-row"><dt>UDID</dt><dd class="mono truncate" title={udid}>{udid}</dd></div>
+              <div class="detail-row"><dt>ECID</dt><dd class="mono">{ecid}</dd></div>
+            </dl>
+          </section>
+        {/if}
+
+        {#if hasSoftware}
+          <section class="detail-card">
+            <h3 class="card-title">Software</h3>
+            <dl class="detail-list">
+              <div class="detail-row"><dt>iOS</dt><dd>{iosVersion}</dd></div>
+              <div class="detail-row"><dt>Build</dt><dd>{buildVersion}</dd></div>
+              <div class="detail-row"><dt>Firmware</dt><dd class="mono truncate" title={firmwareVersion}>{firmwareVersion}</dd></div>
+              <div class="detail-row"><dt>Baseband</dt><dd>{basebandVersion}</dd></div>
+              <div class="detail-row"><dt>Activation</dt><dd>{activationState}</dd></div>
+            </dl>
+          </section>
+        {/if}
+
+        {#if hasHardware}
+          <section class="detail-card">
+            <h3 class="card-title">Hardware</h3>
+            <dl class="detail-list">
+              <div class="detail-row"><dt>CPU Architecture</dt><dd>{cpuArchitecture}</dd></div>
+              <div class="detail-row"><dt>Platform</dt><dd>{hardwarePlatform}</dd></div>
+              <div class="detail-row"><dt>Battery</dt><dd>{batteryCapacity}</dd></div>
+              <div class="detail-row"><dt>Storage</dt><dd>{totalDisk}</dd></div>
+              <div class="detail-row"><dt>Available</dt><dd>{totalAvailable}</dd></div>
+              <div class="detail-row"><dt>Passcode</dt><dd>{passwordProtected}</dd></div>
+            </dl>
+          </section>
+        {/if}
+
+        {#if hasNetwork}
+          <section class="detail-card">
+            <h3 class="card-title">Network</h3>
+            <dl class="detail-list">
+              <div class="detail-row"><dt>Cellular</dt><dd>{telephonyCapability}</dd></div>
+              <div class="detail-row"><dt>IMEI</dt><dd class="mono">{imei}</dd></div>
+              <div class="detail-row"><dt>WiFi MAC</dt><dd class="mono">{wifiAddress}</dd></div>
+              <div class="detail-row"><dt>Bluetooth MAC</dt><dd class="mono">{bluetoothAddress}</dd></div>
+            </dl>
+          </section>
+        {/if}
+      {:else}
+        {#if hasRecoveryInfo}
+          <section class="detail-card">
+            <h3 class="card-title">Recovery Info</h3>
+            <dl class="detail-list">
+              <div class="detail-row"><dt>ECID</dt><dd class="mono">{ecid}</dd></div>
+              <div class="detail-row"><dt>Serial</dt><dd class="mono">{serial}</dd></div>
+              <div class="detail-row"><dt>Model</dt><dd>{model}</dd></div>
+              <div class="detail-row"><dt>Product</dt><dd>{productType}</dd></div>
+              <div class="detail-row"><dt>CPID</dt><dd class="mono">{cpid}</dd></div>
+              <div class="detail-row"><dt>CPRV</dt><dd class="mono">{cprv}</dd></div>
+              <div class="detail-row"><dt>Board ID</dt><dd class="mono">{bdid}</dd></div>
+              <div class="detail-row"><dt>iBoot Flags</dt><dd class="mono">{ibfl}</dd></div>
+            </dl>
+          </section>
+        {/if}
+
+        {#if hasNonces}
+          <section class="detail-card">
+            <h3 class="card-title">Nonces</h3>
+            <dl class="detail-list">
+              <div class="detail-row"><dt>APNonce</dt><dd class="mono truncate" title={apnonce}>{apnonce}</dd></div>
+              <div class="detail-row"><dt>SEPNonce</dt><dd class="mono truncate" title={sepnonce}>{sepnonce}</dd></div>
+            </dl>
+          </section>
+        {/if}
       {/if}
     </div>
-
-    <!-- Vertical Divider -->
-    <div class="vertical-divider"></div>
-
-    <!-- Right: Quick Actions -->
-    <div class="actions-side">
-      <h3 class="section-title">Quick Actions</h3>
-      <div class="actions-grid">
-        {#each quickActions as action}
-          <button
-            class="action-card"
-            onclick={() => navigationStore.navigate(action.view)}
-          >
-            <span class="action-icon">{action.icon}</span>
-            <div class="action-text">
-              <span class="action-label">{action.label}</span>
-              <span class="action-description">{action.description}</span>
-            </div>
-          </button>
-        {/each}
-      </div>
-    </div>
-  </div>
+  {/if}
 </div>
 
 <style>
   .home-view {
     display: flex;
-    justify-content: center;
-    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--spacing-md);
     height: 100%;
     min-height: 0;
     padding: var(--spacing-lg);
     overflow-y: auto;
   }
 
-  /* ── Unified Pane ── */
-  .unified-pane {
-    width: 100%;
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
+  /* ── Hero card ── */
+  .hero-card {
     display: flex;
     flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     gap: var(--spacing-lg);
-    min-height: 0;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    flex-wrap: wrap;
   }
 
-  /* ── Left: Device Details ── */
-  .device-side {
-    flex: 0 0 260px;
+  .hero-device {
     display: flex;
-    flex-direction: column;
     align-items: center;
     gap: var(--spacing-md);
     min-width: 0;
+    flex: 1 1 auto;
   }
 
   .device-illustration {
-    width: 80px;
+    width: 56px;
     color: var(--color-text-primary);
     display: flex;
     align-items: center;
@@ -382,27 +289,25 @@
     height: auto;
   }
 
-  .device-headline {
+  .hero-text {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: var(--spacing-xs);
-    text-align: center;
-    width: 100%;
+    gap: 2px;
+    min-width: 0;
   }
 
   .device-name {
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: var(--color-text-primary);
     margin: 0;
-    line-height: 1.3;
+    line-height: 1.2;
     word-break: break-word;
   }
 
   .device-name.muted {
     color: var(--color-text-secondary);
-    font-size: 1rem;
+    font-weight: 600;
   }
 
   .device-product {
@@ -411,176 +316,140 @@
     font-weight: 500;
   }
 
-  .device-product.muted {
-    font-size: 0.75rem;
-    font-weight: 400;
+  /* ── Action toolbar (compact) ── */
+  .action-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
   }
 
-  .device-details {
-    width: 100%;
+  .action-tile {
     display: flex;
     flex-direction: column;
-    border-top: 1px solid var(--color-border);
-    padding-top: var(--spacing-sm);
-    overflow-y: auto;
-    max-height: calc(100vh - 260px);
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 64px;
+    padding: 8px 6px;
+    background: var(--color-bg-secondary);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    color: var(--color-text-primary);
   }
 
-  .detail-section {
-    margin-top: var(--spacing-sm);
+  .action-tile:hover {
+    background: var(--color-bg-elevated);
+    border-color: var(--color-accent);
+    transform: translateY(-1px);
   }
 
-  .detail-section:first-child {
-    margin-top: 0;
+  .action-tile:active {
+    transform: translateY(0);
   }
 
-  .section-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+  .action-icon {
+    font-size: 1.125rem;
+    line-height: 1;
+  }
+
+  .action-label {
+    font-size: 0.625rem;
+    font-weight: 600;
     color: var(--color-text-secondary);
-    margin-bottom: 4px;
-    opacity: 0.7;
+    white-space: nowrap;
+  }
+
+  .action-tile:hover .action-label {
+    color: var(--color-text-primary);
+  }
+
+  /* ── Detail grid ── */
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+    align-items: start;
+  }
+
+  .detail-card {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    min-width: 0;
+  }
+
+  .card-title {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-secondary);
+    margin: 0 0 var(--spacing-sm) 0;
+  }
+
+  .detail-list {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   .detail-row {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    padding: 5px 0;
     gap: var(--spacing-sm);
+    padding: 7px 0;
     border-bottom: 1px solid var(--color-border);
+    min-width: 0;
   }
 
   .detail-row:last-child {
     border-bottom: none;
   }
 
-  .detail-label {
-    font-size: 0.688rem;
+  .detail-row dt {
+    font-size: 0.75rem;
     color: var(--color-text-secondary);
     font-weight: 500;
     flex-shrink: 0;
   }
 
-  .detail-value {
-    font-size: 0.688rem;
+  .detail-row dd {
+    margin: 0;
+    font-size: 0.75rem;
     color: var(--color-text-primary);
     font-weight: 500;
     text-align: right;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     min-width: 0;
   }
 
-  .detail-value.mono {
+  .detail-row dd.mono {
     font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
     letter-spacing: -0.01em;
   }
 
-  /* ── Vertical Divider ── */
-  .vertical-divider {
-    width: 1px;
-    background: var(--color-border);
-    flex-shrink: 0;
-    align-self: stretch;
-  }
-
-  /* ── Right: Quick Actions ── */
-  .actions-side {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-  }
-
-  .section-title {
-    font-size: 0.938rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    margin: 0;
-  }
-
-  .actions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: var(--spacing-sm);
-    width: 100%;
-  }
-
-  .action-card {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    text-align: left;
-    font-family: inherit;
-    min-width: 0;
-  }
-
-  .action-card:hover {
-    border-color: var(--color-accent);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  }
-
-  .action-icon {
-    font-size: 1.125rem;
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-bg-secondary);
-    border-radius: var(--radius-sm);
-  }
-
-  .action-text {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-width: 0;
-  }
-
-  .action-label {
-    font-size: 0.813rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    white-space: nowrap;
+  .detail-row dd.truncate {
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .action-description {
-    font-size: 0.625rem;
-    color: var(--color-text-secondary);
-    line-height: 1.4;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
-  /* ── Responsive: stack at narrow widths ── */
-  @media (max-width: 600px) {
-    .unified-pane {
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .hero-card {
       flex-direction: column;
+      align-items: flex-start;
     }
 
-    .device-side {
-      flex: none;
+    .action-toolbar {
       width: 100%;
+      justify-content: flex-start;
     }
-
-    .vertical-divider {
-      width: 100%;
-      height: 1px;
-      align-self: auto;
+  }
+</style>
