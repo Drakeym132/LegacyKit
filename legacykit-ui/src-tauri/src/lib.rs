@@ -42,6 +42,20 @@ pub fn run() {
             commands::data::erase_device,
             commands::data::set_backup_encryption,
             commands::data::list_backups,
+            commands::utilities::enter_recovery,
+            commands::utilities::exit_recovery,
+            commands::utilities::run_diagnostics_action,
+            commands::utilities::pair_device,
+            commands::utilities::run_activation_action,
+            commands::utilities::export_device_info,
+            commands::utilities::run_irecovery_commands,
+            commands::utilities::clear_nvram,
+            commands::utilities::start_syslog,
+            commands::utilities::stop_syslog,
+            commands::utilities::syslog_status,
+            commands::trollstore::prepare_trollstore_assets,
+            commands::trollstore::check_trollstore_eligibility,
+            commands::updates::check_for_updates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

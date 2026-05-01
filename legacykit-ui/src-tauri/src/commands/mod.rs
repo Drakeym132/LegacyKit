@@ -5,3 +5,6 @@ pub mod firmware;
 pub mod jailbreak;
 pub mod restore;
 pub mod shsh;
+pub mod trollstore;
+pub mod updates;
+pub mod utilities;

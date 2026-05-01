@@ -11,6 +11,7 @@
   import { runKloader } from '$lib/api/jailbreak';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
+  import { toastStore } from '$lib/stores/toastStore.svelte';
 
   let ipswPath = $state('');
   let outputDir = $state('');
@@ -65,10 +66,12 @@
     try {
       const result = await fn();
       logStore.append(`${label} ok`, 'info');
+      toastStore.success(label, 'Completed');
       return result;
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
       logStore.append(`${label} failed: ${errorMessage}`, 'stderr');
+      toastStore.error(`${label} failed`, errorMessage);
       return null;
     } finally {
       isWorking = false;
