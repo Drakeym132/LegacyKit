@@ -190,10 +190,6 @@
 </div>
 
 <style>
-  .view {
-    padding: var(--spacing-xl);
-    max-width: 860px;
-  }
 
   .view-header {
     margin-bottom: var(--spacing-lg);

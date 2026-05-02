@@ -56,7 +56,7 @@
   }
 </script>
 
-<div class="view">
+<div class="view view--narrow">
   <div class="view-header">
     <h1>Settings</h1>
   </div>
@@ -192,7 +192,6 @@
 </div>
 
 <style>
-  .view { padding: var(--spacing-xl); max-width: 640px; }
   .view-header { margin-bottom: var(--spacing-lg); }
   .view-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--color-text-primary); margin: 0; }
 

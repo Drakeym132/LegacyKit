@@ -100,3 +100,31 @@ button {
   cursor: pointer;
   font-family: inherit;
 }
+
+/* ----- Global view layout system -----
+ * Single source of truth for routed view chrome (sizing, padding, centering).
+ * Every <div class="view"> in src/lib/views/* inherits these rules.
+ *
+ * Per-view styles MUST NOT redefine width / max-width / padding / margin-inline.
+ * To pick a different content cap, add a tier modifier on the wrapper instead:
+ *   <div class="view view--standard"> ...      // 1100px (Restore, Jailbreak, SSH-Ramdisk)
+ *   <div class="view view--narrow"> ...        // 760px  (Settings)
+ *   <div class="view view--hero"> ...          // 720px  (Home)
+ *
+ * Without a modifier the view defaults to .view--wide (1280px), suitable for
+ * dense, multi-column screens like SHSH Blobs, Apps, Data, Utilities.
+ *
+ * Spacing tokens here are the only place to change global gutters.
+ */
+.view {
+  width: 100%;
+  margin-inline: auto;
+  max-width: 1280px;
+  padding-block: clamp(var(--spacing-md), 2.5vh, var(--spacing-xl));
+  padding-inline: clamp(var(--spacing-md), 3vw, var(--spacing-xl));
+}
+
+.view--wide     { max-width: 1280px; }
+.view--standard { max-width: 1100px; }
+.view--narrow   { max-width: 760px; }
+.view--hero     { max-width: 720px; }

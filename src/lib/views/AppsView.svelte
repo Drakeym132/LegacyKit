@@ -182,7 +182,6 @@
 </div>
 
 <style>
-  .view { padding: var(--spacing-xl); max-width: 1024px; }
   .view-header { margin-bottom: var(--spacing-lg); }
   .view-header h1 {
     color: var(--color-text-primary);

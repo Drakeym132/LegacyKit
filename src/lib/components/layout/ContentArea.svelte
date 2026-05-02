@@ -14,10 +14,9 @@
 </script>
 
 <main class="flex-1 flex flex-col overflow-hidden bg-[var(--color-bg-primary)]">
-  <div class="flex-1 overflow-hidden flex flex-col p-6">
-    <div class="flex-1 overflow-auto">
-      <div class="w-full h-full flex flex-col gap-8">
-        {#if navigationStore.currentView === 'home'}
+  <div class="flex-1 overflow-auto">
+    <div class="content-shell">
+      {#if navigationStore.currentView === 'home'}
           <HomeView />
         {:else if navigationStore.currentView === 'restore'}
           <RestoreView />
@@ -36,9 +35,17 @@
         {:else if navigationStore.currentView === 'settings'}
           <SettingsView />
         {/if}
-      </div>
     </div>
   </div>
 
   <TerminalDeck />
 </main>
+
+<style>
+  .content-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    width: 100%;
+  }
+</style>
