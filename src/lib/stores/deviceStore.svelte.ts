@@ -40,46 +40,48 @@ export interface DeviceInfo {
     sepnonce: string | null;
 }
 
+const EMPTY_DEVICE_INFO: DeviceInfo = {
+    connected: false,
+    name: null,
+    udid: null,
+    ecid: null,
+    serial: null,
+    model: null,
+    product_type: null,
+    ios_version: null,
+    mode: 'Normal',
+
+    // Normal mode fields
+    build_version: null,
+    cpu_architecture: null,
+    hardware_platform: null,
+    device_color: null,
+    device_class: null,
+    model_number: null,
+    region_info: null,
+    activation_state: null,
+    baseband_version: null,
+    firmware_version: null,
+    total_disk_capacity: null,
+    total_data_available: null,
+    battery_current_capacity: null,
+    password_protected: null,
+    telephony_capability: null,
+    imei: null,
+    wifi_address: null,
+    bluetooth_address: null,
+
+    // Recovery/DFU mode fields
+    cpid: null,
+    cprv: null,
+    bdid: null,
+    ibfl: null,
+    apnonce: null,
+    sepnonce: null
+};
+
 class DeviceStore {
-    state = $state<DeviceInfo>({
-        connected: false,
-        name: null,
-        udid: null,
-        ecid: null,
-        serial: null,
-        model: null,
-        product_type: null,
-        ios_version: null,
-        mode: 'Normal',
-
-        // Normal mode fields
-        build_version: null,
-        cpu_architecture: null,
-        hardware_platform: null,
-        device_color: null,
-        device_class: null,
-        model_number: null,
-        region_info: null,
-        activation_state: null,
-        baseband_version: null,
-        firmware_version: null,
-        total_disk_capacity: null,
-        total_data_available: null,
-        battery_current_capacity: null,
-        password_protected: null,
-        telephony_capability: null,
-        imei: null,
-        wifi_address: null,
-        bluetooth_address: null,
-
-        // Recovery/DFU mode fields
-        cpid: null,
-        cprv: null,
-        bdid: null,
-        ibfl: null,
-        apnonce: null,
-        sepnonce: null
-    });
+    state = $state<DeviceInfo>({ ...EMPTY_DEVICE_INFO });
 
     updateFromBackend(info: DeviceInfo) {
         this.state = { ...info };
@@ -90,45 +92,7 @@ class DeviceStore {
     }
 
     clearDevice() {
-        this.state = {
-            connected: false,
-            name: null,
-            udid: null,
-            ecid: null,
-            serial: null,
-            model: null,
-            product_type: null,
-            ios_version: null,
-            mode: 'Normal',
-
-            // Normal mode fields
-            build_version: null,
-            cpu_architecture: null,
-            hardware_platform: null,
-            device_color: null,
-            device_class: null,
-            model_number: null,
-            region_info: null,
-            activation_state: null,
-            baseband_version: null,
-            firmware_version: null,
-            total_disk_capacity: null,
-            total_data_available: null,
-            battery_current_capacity: null,
-            password_protected: null,
-            telephony_capability: null,
-            imei: null,
-            wifi_address: null,
-            bluetooth_address: null,
-
-            // Recovery/DFU mode fields
-            cpid: null,
-            cprv: null,
-            bdid: null,
-            ibfl: null,
-            apnonce: null,
-            sepnonce: null
-        };
+        this.state = { ...EMPTY_DEVICE_INFO };
     }
 }
 

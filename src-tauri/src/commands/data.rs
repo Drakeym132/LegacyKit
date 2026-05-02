@@ -5,14 +5,11 @@ use crate::models::data::{
     ListBackupsRequest, ListBackupsResult,
 };
 use crate::platform::resolve_binary_path;
-use serde::Serialize;
+use crate::tools::util::{nullable, timestamp_dir_now};
 use std::fs;
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::thread;
+use std::path::Path;
 use std::time::UNIX_EPOCH;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
 const ERASE_CONFIRMATION: &str = "Yes, do as I say";
 
@@ -27,7 +24,7 @@ pub async fn create_backup(
     }
     fs::create_dir_all(backup_root)?;
 
-    let stamp = format_timestamp_dir();
+    let stamp = timestamp_dir_now();
     let backup_path = Path::new(backup_root).join(&stamp);
     fs::create_dir_all(&backup_path)?;
 
@@ -43,13 +40,13 @@ pub async fn create_backup(
     args.push(backup_path.to_string_lossy().to_string());
 
     let binary = resolve_binary_path(&app, "idevicebackup2").map_err(AppError::CommandFailed)?;
-    emit_data_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Starting idevicebackup2 backup → {}", backup_path.display()),
     );
-    run_process_streaming(&app, binary, &args)?;
-    emit_data_log(&app, "info", "Backup completed");
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
+    crate::tools::runner::emit_log(&app, "info", "Backup completed");
 
     Ok(BackupCreateResult {
         backup_path: backup_path.to_string_lossy().to_string(),
@@ -90,13 +87,13 @@ pub async fn restore_backup(
     args.push(backup_path.to_string());
 
     let binary = resolve_binary_path(&app, "idevicebackup2").map_err(AppError::CommandFailed)?;
-    emit_data_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Restoring backup from {backup_path}"),
     );
-    run_process_streaming(&app, binary, &args)?;
-    emit_data_log(&app, "info", "Restore completed");
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
+    crate::tools::runner::emit_log(&app, "info", "Restore completed");
 
     Ok(BackupRestoreResult {
         backup_path: backup_path.to_string(),
@@ -123,13 +120,13 @@ pub async fn erase_device(
     args.push("erase".into());
 
     let binary = resolve_binary_path(&app, "idevicebackup2").map_err(AppError::CommandFailed)?;
-    emit_data_log(
+    crate::tools::runner::emit_log(
         &app,
         "warn",
         "Erasing device (Erase All Content and Settings)",
     );
-    run_process_streaming(&app, binary, &args)?;
-    emit_data_log(&app, "info", "Erase request issued");
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
+    crate::tools::runner::emit_log(&app, "info", "Erase request issued");
 
     Ok(EraseDeviceResult { args })
 }
@@ -147,12 +144,12 @@ pub async fn set_backup_encryption(
     args.extend(request.action.as_args());
 
     let binary = resolve_binary_path(&app, "idevicebackup2").map_err(AppError::CommandFailed)?;
-    emit_data_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Backup encryption: {:?}", request.action),
     );
-    run_process_streaming(&app, binary, &args)?;
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
 
     Ok(BackupEncryptionResult {
         action: request.action,
@@ -224,127 +221,4 @@ fn dir_size(dir: &Path) -> Option<u64> {
         }
     }
     Some(total)
-}
-
-fn format_timestamp_dir() -> String {
-    use std::time::SystemTime;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let (year, month, day, hour, minute) = unix_to_components(now);
-    format!("{year:04}-{month:02}-{day:02}-{hour:02}{minute:02}")
-}
-
-/// Minimal Unix-timestamp → (year, month, day, hour, minute) decomposition without
-/// pulling in chrono. Good for filename stamps.
-fn unix_to_components(secs: u64) -> (u32, u32, u32, u32, u32) {
-    let days = (secs / 86_400) as i64;
-    let seconds_of_day = (secs % 86_400) as u32;
-    let hour = seconds_of_day / 3600;
-    let minute = (seconds_of_day % 3600) / 60;
-
-    // 1970-01-01 is day 0 (Thursday). Use civil_from_days algorithm.
-    let z = days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = if m <= 2 { y + 1 } else { y };
-    (year as u32, m as u32, d as u32, hour, minute)
-}
-
-fn nullable(value: Option<&str>) -> Option<&str> {
-    value.map(str::trim).filter(|v| !v.is_empty())
-}
-
-fn run_process_streaming(
-    app: &AppHandle,
-    binary: PathBuf,
-    args: &[String],
-) -> Result<(), AppError> {
-    let mut child = Command::new(&binary)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stdout".to_string()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stderr".to_string()))?;
-
-    let stdout_app = app.clone();
-    let stdout_thread = thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_data_log(&stdout_app, "stdout", &line);
-        }
-    });
-
-    let stderr_app = app.clone();
-    let stderr_thread = thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_data_log(&stderr_app, "stderr", &line);
-        }
-    });
-
-    let status = child.wait()?;
-    let _ = stdout_thread.join();
-    let _ = stderr_thread.join();
-
-    if !status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "{} exited with status {}",
-            binary.display(),
-            status
-        )));
-    }
-    Ok(())
-}
-
-fn emit_data_log(app: &AppHandle, level: &str, text: &str) {
-    let payload = LogEventPayload {
-        text: text.to_string(),
-        kind: level.to_string(),
-    };
-    let _ = app.emit("log_event", payload);
-}
-
-#[derive(Clone, Serialize)]
-struct LogEventPayload {
-    text: String,
-    #[serde(rename = "type")]
-    kind: String,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn unix_epoch_decomposes_correctly() {
-        assert_eq!(unix_to_components(0), (1970, 1, 1, 0, 0));
-    }
-
-    #[test]
-    fn known_timestamp_decomposes_correctly() {
-        // 2026-04-30 12:34:00 UTC = 1777552440
-        assert_eq!(unix_to_components(1_777_552_440), (2026, 4, 30, 12, 34));
-    }
-
-    #[test]
-    fn leap_day_decomposes_correctly() {
-        // 2024-02-29 00:00:00 UTC = 1709164800
-        assert_eq!(unix_to_components(1_709_164_800), (2024, 2, 29, 0, 0));
-    }
 }

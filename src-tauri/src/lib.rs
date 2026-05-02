@@ -11,9 +11,6 @@ pub fn run() {
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            tools::runner::execute_tool,
-            tools::runner::execute_idevice_info,
-            tools::runner::execute_irecovery,
             commands::device::detect_device,
             commands::restore::get_restore_options,
             commands::restore::download_ipsw,

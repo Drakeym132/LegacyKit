@@ -4,13 +4,10 @@ use crate::models::trollstore::{
     TrollStorePrepareRequest, TrollStorePrepareResult,
 };
 use crate::platform::resolve_binary_path;
-use serde::Serialize;
 use std::fs;
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::thread;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
 const RELEASES_API: &str = "https://api.github.com/repos/opa334/TrollStore/releases/latest";
 
@@ -34,7 +31,7 @@ pub async fn prepare_trollstore_assets(
         Some(v) if !v.trim().is_empty() => v.trim().to_string(),
         _ => fetch_latest_version(&app)?,
     };
-    emit_log(&app, "info", &format!("Latest TrollStore version: {latest}"));
+    crate::tools::runner::emit_log(&app, "info", &format!("Latest TrollStore version: {latest}"));
 
     let cached_version = fs::read_to_string(&version_stamp)
         .ok()
@@ -47,7 +44,7 @@ pub async fn prepare_trollstore_assets(
         && helper_path.metadata().map(|m| m.len() > 0).unwrap_or(false);
 
     if cached_version == latest && assets_present {
-        emit_log(
+        crate::tools::runner::emit_log(
             &app,
             "info",
             &format!("Using cached TrollStore {latest} assets"),
@@ -81,7 +78,7 @@ pub async fn prepare_trollstore_assets(
     }
 
     fs::write(&version_stamp, format!("{latest}\n"))?;
-    emit_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Downloaded TrollStore {latest} assets to {}", dest.display()),
@@ -105,14 +102,13 @@ pub async fn check_trollstore_eligibility(
         .and_then(parse_ios_major);
     let product = request.product_type.as_deref().map(str::to_lowercase);
 
-    if major.is_none() {
+    let Some(major) = major else {
         return Ok(TrollStoreEligibilityResult {
             path: TrollStorePath::Unknown,
             reason: "iOS version unknown — connect a paired device first.".into(),
             ios_major: None,
         });
-    }
-    let major = major.unwrap();
+    };
 
     if major < 14 {
         return Ok(TrollStoreEligibilityResult {
@@ -159,7 +155,7 @@ fn fetch_latest_version(app: &AppHandle) -> Result<String, AppError> {
     let curl = which("curl").ok_or_else(|| {
         AppError::CommandFailed("curl is required to query GitHub releases".into())
     })?;
-    emit_log(app, "info", "Querying GitHub for latest TrollStore version");
+    crate::tools::runner::emit_log(app, "info", "Querying GitHub for latest TrollStore version");
     let output = Command::new(&curl)
         .args([
             "-fsSL",
@@ -205,8 +201,8 @@ fn download_with_aria2(
         file_name.to_string(),
         url.to_string(),
     ];
-    emit_log(app, "info", &format!("Downloading {file_name}"));
-    run_process_streaming(app, aria2c.to_path_buf(), &args)
+    crate::tools::runner::emit_log(app, "info", &format!("Downloading {file_name}"));
+    crate::tools::runner::run_streaming(app, aria2c.to_path_buf(), &args)
 }
 
 fn parse_tag_name(body: &str) -> Option<String> {
@@ -246,70 +242,6 @@ fn which(bin: &str) -> Option<PathBuf> {
         }
     }
     None
-}
-
-fn run_process_streaming(
-    app: &AppHandle,
-    binary: PathBuf,
-    args: &[String],
-) -> Result<(), AppError> {
-    let mut child = Command::new(&binary)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stdout".into()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stderr".into()))?;
-
-    let stdout_app = app.clone();
-    let stdout_thread = thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_log(&stdout_app, "stdout", &line);
-        }
-    });
-    let stderr_app = app.clone();
-    let stderr_thread = thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_log(&stderr_app, "stderr", &line);
-        }
-    });
-
-    let status = child.wait()?;
-    let _ = stdout_thread.join();
-    let _ = stderr_thread.join();
-
-    if !status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "{} exited with status {}",
-            binary.display(),
-            status
-        )));
-    }
-    Ok(())
-}
-
-fn emit_log(app: &AppHandle, level: &str, text: &str) {
-    let payload = LogEventPayload {
-        text: text.to_string(),
-        kind: level.to_string(),
-    };
-    let _ = app.emit("log_event", payload);
-}
-
-#[derive(Clone, Serialize)]
-struct LogEventPayload {
-    text: String,
-    #[serde(rename = "type")]
-    kind: String,
 }
 
 #[cfg(test)]

@@ -431,7 +431,7 @@ fn infer_processor_generation(product_type: &str) -> Option<u8> {
 }
 
 fn matches_any(value: &str, candidates: &[&str]) -> bool {
-    candidates.iter().any(|candidate| value == *candidate)
+    candidates.contains(&value)
 }
 
 fn product_family_in(

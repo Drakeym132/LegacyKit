@@ -2,11 +2,9 @@ use crate::error::AppError;
 use crate::platform::resolve_binary_path;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
-use std::io::{self, BufRead, BufReader};
+use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::thread;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,7 +49,7 @@ pub async fn extract_ipsw_component(
         fs::create_dir_all(parent)?;
     }
 
-    emit_firmware_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Extracting {component_path} from {ipsw_path}"),
@@ -59,7 +57,7 @@ pub async fn extract_ipsw_component(
 
     let bytes = extract_zip_entry(ipsw_path, component_path, &output_path)?;
 
-    emit_firmware_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Wrote {} bytes to {}", bytes, output_path.display()),
@@ -151,7 +149,7 @@ pub async fn patch_iboot(
     let binary =
         resolve_binary_path(&app, request.bit_width.binary_name()).map_err(AppError::CommandFailed)?;
 
-    emit_firmware_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!(
@@ -160,7 +158,7 @@ pub async fn patch_iboot(
             output_path
         ),
     );
-    run_process_streaming(&app, binary.clone(), &args)?;
+    crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
 
     if !Path::new(output_path).exists() {
         return Err(AppError::CommandFailed(format!(
@@ -265,12 +263,12 @@ pub async fn pack_img4(
     let args = build_img4_pack_args(im4p_path, output_path, shsh_path, im4m_path);
     let binary = resolve_binary_path(&app, "img4tool").map_err(AppError::CommandFailed)?;
 
-    emit_firmware_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Packing IMG4 -> {output_path}"),
     );
-    run_process_streaming(&app, binary.clone(), &args)?;
+    crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
 
     if !Path::new(output_path).exists() {
         return Err(AppError::CommandFailed(format!(
@@ -376,12 +374,12 @@ pub async fn repack_img3(
     let args = build_img3_repack_args(input_path, output_path, template_path, key, iv);
     let binary = resolve_binary_path(&app, "xpwntool").map_err(AppError::CommandFailed)?;
 
-    emit_firmware_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Repacking IMG3 -> {output_path}"),
     );
-    run_process_streaming(&app, binary.clone(), &args)?;
+    crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
 
     if !Path::new(output_path).exists() {
         return Err(AppError::CommandFailed(format!(
@@ -466,12 +464,12 @@ pub async fn modify_ramdisk(
     let args = build_ramdisk_args(&request)?;
     let binary = resolve_binary_path(&app, "hfsplus").map_err(AppError::CommandFailed)?;
 
-    emit_firmware_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("hfsplus {} {}", ramdisk_path, args[1..].join(" ")),
     );
-    run_process_streaming(&app, binary.clone(), &args)?;
+    crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
 
     Ok(RamdiskModifyResult {
         ramdisk_path: ramdisk_path.to_string(),
@@ -595,12 +593,12 @@ pub async fn patch_kernel(
     }
 
     let binary = resolve_binary_path(&app, binary_name).map_err(AppError::CommandFailed)?;
-    emit_firmware_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Patching kernel ({binary_name}) -> {output_path}"),
     );
-    run_process_streaming(&app, binary.clone(), &args)?;
+    crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
 
     if !Path::new(output_path).exists() {
         return Err(AppError::CommandFailed(format!(
@@ -613,72 +611,6 @@ pub async fn patch_kernel(
         binary: binary.to_string_lossy().to_string(),
         args,
     })
-}
-
-fn run_process_streaming(
-    app: &AppHandle,
-    binary: PathBuf,
-    args: &[String],
-) -> Result<(), AppError> {
-    let mut child = Command::new(&binary)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stdout".to_string()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stderr".to_string()))?;
-
-    let stdout_app = app.clone();
-    let stdout_thread = thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_firmware_log(&stdout_app, "stdout", &line);
-        }
-    });
-
-    let stderr_app = app.clone();
-    let stderr_thread = thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_firmware_log(&stderr_app, "stderr", &line);
-        }
-    });
-
-    let status = child.wait()?;
-    let _ = stdout_thread.join();
-    let _ = stderr_thread.join();
-
-    if !status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "{} exited with status {}",
-            binary.display(),
-            status
-        )));
-    }
-
-    Ok(())
-}
-
-fn emit_firmware_log(app: &AppHandle, level: &str, text: &str) {
-    let payload = LogEventPayload {
-        text: text.to_string(),
-        kind: level.to_string(),
-    };
-    let _ = app.emit("log_event", payload);
-}
-
-#[derive(Clone, Serialize)]
-struct LogEventPayload {
-    text: String,
-    #[serde(rename = "type")]
-    kind: String,
 }
 
 #[cfg(test)]

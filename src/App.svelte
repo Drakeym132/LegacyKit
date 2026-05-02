@@ -8,6 +8,7 @@
   import { listen } from '@tauri-apps/api/event';
   import { deviceStore } from './lib/stores/deviceStore.svelte';
   import type { DeviceInfo } from './lib/stores/deviceStore.svelte';
+  import type { LogEventPayload } from './lib/stores/logStore.svelte';
   import { logStore } from './lib/stores/logStore.svelte';
   import { settingsStore } from './lib/stores/settingsStore.svelte';
   
@@ -58,8 +59,8 @@
   });
 
   onMount(() => {
-    const unlistenLog = listen('log_event', (event: any) => {
-      const { text, type } = event.payload as { text: string; type: 'stdout' | 'stderr' | 'info' };
+    const unlistenLog = listen<LogEventPayload>('log_event', (event) => {
+      const { text, type } = event.payload;
       logStore.append(text, type);
     });
 

@@ -9,13 +9,9 @@ use crate::platform::resolve_binary_path;
 use crate::services::ipsw_prep;
 use crate::services::restore_options::determine_restore_options;
 use crate::services::sha1::sha1_file;
-use serde::Serialize;
 use std::fs;
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::thread;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
 #[tauri::command]
 pub async fn get_restore_options(device: DeviceInfo) -> Result<RestoreOptionsResponse, AppError> {
@@ -58,7 +54,7 @@ pub async fn download_ipsw(
         ));
     }
 
-    emit_restore_log(&app, "info", &format!("Downloading {file_name}"));
+    crate::tools::runner::emit_log(&app, "info", &format!("Downloading {file_name}"));
     let aria2c = resolve_binary_path(&app, "aria2c").map_err(AppError::CommandFailed)?;
     let args = vec![
         "--continue=true".to_string(),
@@ -72,7 +68,7 @@ pub async fn download_ipsw(
         url.to_string(),
     ];
 
-    run_process_streaming(&app, aria2c, &args)?;
+    crate::tools::runner::run_streaming(&app, aria2c, &args)?;
 
     let path = output_dir.join(file_name);
     if !path.exists() {
@@ -128,7 +124,7 @@ pub async fn start_restore(
 ) -> Result<RestoreCommandPreview, AppError> {
     let preview = build_restore_command(&request)?;
     if request.dry_run {
-        emit_restore_log(
+        crate::tools::runner::emit_log(
             &app,
             "info",
             "Dry run requested; restore command was not started",
@@ -138,13 +134,13 @@ pub async fn start_restore(
 
     let binary_path =
         resolve_binary_path(&app, &preview.binary).map_err(AppError::CommandFailed)?;
-    emit_restore_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Starting {} {}", preview.binary, preview.args.join(" ")),
     );
-    run_process_streaming(&app, binary_path, &preview.args)?;
-    emit_restore_log(&app, "info", "Restore tool finished");
+    crate::tools::runner::run_streaming(&app, binary_path, &preview.args)?;
+    crate::tools::runner::emit_log(&app, "info", "Restore tool finished");
 
     Ok(preview)
 }
@@ -193,8 +189,8 @@ pub async fn prepare_ipsw(
     let args = ipsw_prep::build_powdersn0w_args(ipsw_path, &output_path, shsh_path, ecid);
 
     let binary = resolve_binary_path(&app, "powdersn0w").map_err(AppError::CommandFailed)?;
-    emit_restore_log(&app, "info", "Preparing custom IPSW with powdersn0w...");
-    run_process_streaming(&app, binary, &args)?;
+    crate::tools::runner::emit_log(&app, "info", "Preparing custom IPSW with powdersn0w...");
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
 
     if !output_path.exists() {
         return Err(AppError::CommandFailed(format!(
@@ -203,7 +199,7 @@ pub async fn prepare_ipsw(
         )));
     }
 
-    emit_restore_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Custom IPSW ready: {}", output_path.display()),
@@ -295,76 +291,10 @@ fn build_restore_command(request: &RestoreRunRequest) -> Result<RestoreCommandPr
     })
 }
 
-fn run_process_streaming(
-    app: &AppHandle,
-    binary: PathBuf,
-    args: &[String],
-) -> Result<(), AppError> {
-    let mut child = Command::new(&binary)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stdout".to_string()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stderr".to_string()))?;
-
-    let stdout_app = app.clone();
-    let stdout_thread = thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_restore_log(&stdout_app, "stdout", &line);
-        }
-    });
-
-    let stderr_app = app.clone();
-    let stderr_thread = thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_restore_log(&stderr_app, "stderr", &line);
-        }
-    });
-
-    let status = child.wait()?;
-    let _ = stdout_thread.join();
-    let _ = stderr_thread.join();
-
-    if !status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "{} exited with status {}",
-            binary.display(),
-            status
-        )));
-    }
-
-    Ok(())
-}
-
 fn file_name_from_url(url: &str) -> Option<String> {
     url.split('/')
         .next_back()
         .and_then(|part| part.split('?').next())
         .filter(|part| !part.is_empty())
         .map(ToOwned::to_owned)
-}
-
-fn emit_restore_log(app: &AppHandle, level: &str, text: &str) {
-    let payload = LogEventPayload {
-        text: text.to_string(),
-        kind: level.to_string(),
-    };
-    let _ = app.emit("log_event", payload);
-}
-
-#[derive(Clone, Serialize)]
-struct LogEventPayload {
-    text: String,
-    #[serde(rename = "type")]
-    kind: String,
 }

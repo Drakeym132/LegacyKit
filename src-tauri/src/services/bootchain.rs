@@ -1,12 +1,8 @@
 use crate::error::AppError;
 use crate::platform::resolve_binary_path;
-use serde::Serialize;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::thread;
-use tauri::{AppHandle, Emitter};
+use std::path::Path;
+use tauri::AppHandle;
 
 #[derive(Debug, Clone)]
 pub struct PreparedBootchain {
@@ -26,7 +22,7 @@ pub fn prepare_cached_bootchain(
     let cached_ibec = cache_dir.join("iBEC.repacked");
 
     if cache_is_reusable(ipsw_path, &cached_ibss, include_ibec.then_some(&cached_ibec))? {
-        emit_log(
+        crate::tools::runner::emit_log(
             app,
             "info",
             &format!(
@@ -62,12 +58,12 @@ pub fn prepare_cached_bootchain(
         None
     };
 
-    emit_log(app, "info", &format!("Extracting {ibss_component}"));
+    crate::tools::runner::emit_log(app, "info", &format!("Extracting {ibss_component}"));
     let ibss_extracted = work_dir.join("iBSS.extracted");
     extract_zip_entry(ipsw_path, &ibss_component, &ibss_extracted)?;
 
     let ibec_extracted = if let Some(component) = ibec_component.as_deref() {
-        emit_log(app, "info", &format!("Extracting {component}"));
+        crate::tools::runner::emit_log(app, "info", &format!("Extracting {component}"));
         let path = work_dir.join("iBEC.extracted");
         extract_zip_entry(ipsw_path, component, &path)?;
         Some(path)
@@ -118,12 +114,12 @@ pub fn run_kloader_with_paths(
         args.push(ibec.to_string());
     }
     let binary = resolve_binary_path(app, "kloader").map_err(AppError::CommandFailed)?;
-    emit_log(
+    crate::tools::runner::emit_log(
         app,
         "info",
         &format!("Booting patched components with kloader: {}", args.join(" ")),
     );
-    run_process_streaming(app, binary, &args)
+    crate::tools::runner::run_streaming(app, binary, &args)
 }
 
 fn patch_iboot32(app: &AppHandle, input: &Path, output: &Path, boot_args: &str) -> Result<(), AppError> {
@@ -135,12 +131,12 @@ fn patch_iboot32(app: &AppHandle, input: &Path, output: &Path, boot_args: &str) 
         "-b".to_string(),
         boot_args.to_string(),
     ];
-    emit_log(
+    crate::tools::runner::emit_log(
         app,
         "info",
         &format!("Patching iBoot -> {}", output.to_string_lossy()),
     );
-    run_process_streaming(app, binary, &args)
+    crate::tools::runner::run_streaming(app, binary, &args)
 }
 
 fn pack_img4(app: &AppHandle, input: &Path, output: &Path) -> Result<(), AppError> {
@@ -151,12 +147,12 @@ fn pack_img4(app: &AppHandle, input: &Path, output: &Path) -> Result<(), AppErro
         "-p".to_string(),
         input.to_string_lossy().to_string(),
     ];
-    emit_log(
+    crate::tools::runner::emit_log(
         app,
         "info",
         &format!("Packing IMG4 -> {}", output.to_string_lossy()),
     );
-    run_process_streaming(app, binary, &args)
+    crate::tools::runner::run_streaming(app, binary, &args)
 }
 
 fn repack_img3(app: &AppHandle, input: &Path, output: &Path) -> Result<(), AppError> {
@@ -165,12 +161,12 @@ fn repack_img3(app: &AppHandle, input: &Path, output: &Path) -> Result<(), AppEr
         input.to_string_lossy().to_string(),
         output.to_string_lossy().to_string(),
     ];
-    emit_log(
+    crate::tools::runner::emit_log(
         app,
         "info",
         &format!("Repacking IMG3 -> {}", output.to_string_lossy()),
     );
-    run_process_streaming(app, binary, &args)
+    crate::tools::runner::run_streaming(app, binary, &args)
 }
 
 fn extract_zip_entry(archive_path: &str, entry_name: &str, output_path: &Path) -> Result<(), AppError> {
@@ -231,66 +227,4 @@ fn cache_is_reusable(
         }
     }
     Ok(true)
-}
-
-fn run_process_streaming(app: &AppHandle, binary: PathBuf, args: &[String]) -> Result<(), AppError> {
-    let mut child = Command::new(&binary)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stdout".to_string()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stderr".to_string()))?;
-
-    let stdout_app = app.clone();
-    let stdout_thread = thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_log(&stdout_app, "stdout", &line);
-        }
-    });
-
-    let stderr_app = app.clone();
-    let stderr_thread = thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_log(&stderr_app, "stderr", &line);
-        }
-    });
-
-    let status = child.wait()?;
-    let _ = stdout_thread.join();
-    let _ = stderr_thread.join();
-
-    if !status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "{} exited with status {}",
-            binary.display(),
-            status
-        )));
-    }
-
-    Ok(())
-}
-
-fn emit_log(app: &AppHandle, level: &str, text: &str) {
-    let payload = LogEventPayload {
-        text: text.to_string(),
-        kind: level.to_string(),
-    };
-    let _ = app.emit("log_event", payload);
-}
-
-#[derive(Clone, Serialize)]
-struct LogEventPayload {
-    text: String,
-    #[serde(rename = "type")]
-    kind: String,
 }

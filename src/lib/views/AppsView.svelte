@@ -8,14 +8,13 @@
   } from '$lib/api/apps';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
-  import { toastStore } from '$lib/stores/toastStore.svelte';
+  import { createWorkingController } from '$lib/utils/workingState.svelte';
 
   let scope = $state<AppListScope>('user');
   let apps = $state<InstalledApp[]>([]);
   let filter = $state('');
   let ipaPathsRaw = $state('');
-  let isWorking = $state(false);
-  let errorMessage = $state<string | null>(null);
+  const work = createWorkingController();
 
   let device = $derived(deviceStore.state);
   let filteredApps = $derived(
@@ -30,27 +29,8 @@
         }),
   );
 
-  async function withWorking<T>(label: string, fn: () => Promise<T>): Promise<T | null> {
-    isWorking = true;
-    errorMessage = null;
-    logStore.append(`${label}...`, 'info');
-    try {
-      const result = await fn();
-      logStore.append(`${label} ok`, 'info');
-      toastStore.success(label, 'Completed');
-      return result;
-    } catch (err) {
-      errorMessage = err instanceof Error ? err.message : String(err);
-      logStore.append(`${label} failed: ${errorMessage}`, 'stderr');
-      toastStore.error(`${label} failed`, errorMessage);
-      return null;
-    } finally {
-      isWorking = false;
-    }
-  }
-
   async function refresh() {
-    const result = await withWorking(`List ${scope} apps`, () =>
+    const result = await work.run(`List ${scope} apps`, () =>
       listInstalledApps({ scope }),
     );
     if (result) {
@@ -64,10 +44,10 @@
       .map((s) => s.trim())
       .filter(Boolean);
     if (ipaPaths.length === 0) {
-      errorMessage = 'Provide at least one IPA path (one per line).';
+      work.setError('Provide at least one IPA path (one per line).');
       return;
     }
-    const result = await withWorking(`Install ${ipaPaths.length} IPA(s)`, () =>
+    const result = await work.run(`Install ${ipaPaths.length} IPA(s)`, () =>
       installIpa({ ipaPaths }),
     );
     if (result) {
@@ -80,7 +60,7 @@
   async function handleUninstall(bundleId: string) {
     const ok = confirm(`Uninstall ${bundleId}? This cannot be undone.`);
     if (!ok) return;
-    const result = await withWorking(`Uninstall ${bundleId}`, () =>
+    const result = await work.run(`Uninstall ${bundleId}`, () =>
       uninstallApp({ bundleId }),
     );
     if (result) {
@@ -112,8 +92,8 @@
     </div>
   </section>
 
-  {#if errorMessage}
-    <div class="error-state">{errorMessage}</div>
+  {#if work.errorMessage}
+    <div class="error-state">{work.errorMessage}</div>
   {/if}
 
   <section class="panel">
@@ -131,8 +111,8 @@
       ></textarea>
     </label>
     <div class="actions">
-      <button class="primary" onclick={handleInstall} disabled={isWorking}>
-        {isWorking ? 'Working…' : 'Install'}
+      <button class="primary" onclick={handleInstall} disabled={work.isWorking}>
+        {work.isWorking ? 'Working…' : 'Install'}
       </button>
     </div>
   </section>
@@ -154,8 +134,8 @@
         <input bind:value={filter} placeholder="bundle id or display name" />
       </label>
       <div class="actions">
-        <button class="secondary" onclick={refresh} disabled={isWorking}>
-          {isWorking ? 'Working…' : 'Refresh'}
+        <button class="secondary" onclick={refresh} disabled={work.isWorking}>
+          {work.isWorking ? 'Working…' : 'Refresh'}
         </button>
       </div>
     </div>
@@ -183,7 +163,7 @@
                 <button
                   class="danger"
                   onclick={() => handleUninstall(app.bundleId)}
-                  disabled={isWorking}
+                  disabled={work.isWorking}
                 >
                   Uninstall
                 </button>

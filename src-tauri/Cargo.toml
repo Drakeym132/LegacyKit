@@ -1,8 +1,8 @@
 [package]
-name = "app"
+name = "legacykit"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "LegacyKit — restore, jailbreak, and manage legacy iOS devices"
+authors = ["LegacyKit contributors"]
 license = ""
 repository = ""
 edition = "2021"

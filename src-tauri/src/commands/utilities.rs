@@ -6,14 +6,13 @@ use crate::models::utilities::{
     SyslogStartRequest, SyslogStatusResult, UdidRequest,
 };
 use crate::platform::resolve_binary_path;
-use serde::Serialize;
+use crate::tools::util::{nullable, timestamp_dir_now};
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
-use std::time::UNIX_EPOCH;
 use tauri::{AppHandle, Emitter};
 
 static SYSLOG_CHILD: Mutex<Option<Child>> = Mutex::new(None);
@@ -29,8 +28,8 @@ pub async fn enter_recovery(
         AppError::Parse("UDID is required to enter recovery (device must be in Normal mode)".into())
     })?;
     let args = vec![udid.to_string()];
-    emit_log(&app, "info", &format!("Entering recovery mode for {udid}"));
-    run_process_streaming(&app, binary, &args)?;
+    crate::tools::runner::emit_log(&app, "info", &format!("Entering recovery mode for {udid}"));
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
     Ok(CommandRunResult { args })
 }
 
@@ -38,8 +37,8 @@ pub async fn enter_recovery(
 pub async fn exit_recovery(app: AppHandle) -> Result<CommandRunResult, AppError> {
     let binary = resolve_binary_path(&app, "irecovery").map_err(AppError::CommandFailed)?;
     let args = vec!["-n".to_string()];
-    emit_log(&app, "info", "Exiting recovery mode (irecovery -n)");
-    run_process_streaming(&app, binary, &args)?;
+    crate::tools::runner::emit_log(&app, "info", "Exiting recovery mode (irecovery -n)");
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
     Ok(CommandRunResult { args })
 }
 
@@ -63,12 +62,12 @@ pub async fn run_diagnostics_action(
         }
         .to_string(),
     );
-    emit_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("idevicediagnostics {:?}", request.action),
     );
-    run_process_streaming(&app, binary, &args)?;
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
     Ok(DiagnosticsResult {
         action: request.action,
         args,
@@ -94,8 +93,8 @@ pub async fn pair_device(
         }
         .to_string(),
     );
-    emit_log(&app, "info", &format!("idevicepair {:?}", request.action));
-    run_process_streaming(&app, binary, &args)?;
+    crate::tools::runner::emit_log(&app, "info", &format!("idevicepair {:?}", request.action));
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
     Ok(PairResult {
         action: request.action,
         args,
@@ -121,7 +120,7 @@ pub async fn run_activation_action(
     };
     args.push(action_arg.to_string());
 
-    emit_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("ideviceactivation {action_arg}"),
@@ -142,7 +141,7 @@ pub async fn run_activation_action(
             }));
         }
         let state = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        emit_log(&app, "stdout", &state);
+        crate::tools::runner::emit_log(&app, "stdout", &state);
         return Ok(ActivationResult {
             action: request.action,
             state: Some(state),
@@ -150,7 +149,7 @@ pub async fn run_activation_action(
         });
     }
 
-    run_process_streaming(&app, binary, &args)?;
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
     Ok(ActivationResult {
         action: request.action,
         state: None,
@@ -191,7 +190,7 @@ pub async fn export_device_info(
     }
     args.extend(base_args);
 
-    let stamp = format_timestamp_dir();
+    let stamp = timestamp_dir_now();
     let label = request
         .label
         .as_deref()
@@ -201,7 +200,7 @@ pub async fn export_device_info(
     let filename = format!("{label}-{stamp}.txt");
     let out_path = Path::new(output_dir).join(&filename);
 
-    emit_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Exporting {label} → {}", out_path.display()),
@@ -222,7 +221,7 @@ pub async fn export_device_info(
     }
     fs::write(&out_path, &output.stdout)?;
     let bytes = output.stdout.len() as u64;
-    emit_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Exported {bytes} bytes to {}", out_path.display()),
@@ -251,15 +250,15 @@ pub async fn run_irecovery_commands(
             continue;
         }
         let args = vec!["-c".to_string(), trimmed.to_string()];
-        emit_log(&app, "info", &format!("irecovery -c {trimmed:?}"));
-        run_process_streaming(&app, binary.clone(), &args)?;
+        crate::tools::runner::emit_log(&app, "info", &format!("irecovery -c {trimmed:?}"));
+        crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
         all_args.extend(args);
     }
 
     if request.reboot_after {
         let args = vec!["-n".to_string()];
-        emit_log(&app, "info", "irecovery -n (reboot)");
-        run_process_streaming(&app, binary, &args)?;
+        crate::tools::runner::emit_log(&app, "info", "irecovery -n (reboot)");
+        crate::tools::runner::run_streaming(&app, binary, &args)?;
         all_args.extend(args);
     }
 
@@ -304,7 +303,7 @@ pub async fn start_syslog(
         args.push("-u".into());
         args.push(udid.to_string());
     }
-    emit_log(&app, "info", "Starting idevicesyslog");
+    crate::tools::runner::emit_log(&app, "info", "Starting idevicesyslog");
 
     let mut child = Command::new(&binary)
         .args(&args)
@@ -358,7 +357,7 @@ pub async fn stop_syslog(app: AppHandle) -> Result<SyslogStatusResult, AppError>
     if let Some(mut child) = guard.take() {
         let _ = child.kill();
         let _ = child.wait();
-        emit_log(&app, "info", "Stopped idevicesyslog");
+        crate::tools::runner::emit_log(&app, "info", "Stopped idevicesyslog");
     }
     Ok(SyslogStatusResult {
         running: false,
@@ -383,102 +382,10 @@ pub async fn syslog_status() -> Result<SyslogStatusResult, AppError> {
     })
 }
 
-fn nullable(value: Option<&str>) -> Option<&str> {
-    value.map(str::trim).filter(|v| !v.is_empty())
-}
-
-fn run_process_streaming(
-    app: &AppHandle,
-    binary: PathBuf,
-    args: &[String],
-) -> Result<(), AppError> {
-    let mut child = Command::new(&binary)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stdout".to_string()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stderr".to_string()))?;
-
-    let stdout_app = app.clone();
-    let stdout_thread = thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_log(&stdout_app, "stdout", &line);
-        }
-    });
-    let stderr_app = app.clone();
-    let stderr_thread = thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_log(&stderr_app, "stderr", &line);
-        }
-    });
-
-    let status = child.wait()?;
-    let _ = stdout_thread.join();
-    let _ = stderr_thread.join();
-
-    if !status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "{} exited with status {}",
-            binary.display(),
-            status
-        )));
-    }
-    Ok(())
-}
-
-fn emit_log(app: &AppHandle, level: &str, text: &str) {
-    emit_log_with_event(app, "log_event", level, text);
-}
-
 fn emit_log_with_event(app: &AppHandle, event: &str, level: &str, text: &str) {
-    let payload = LogEventPayload {
+    let payload = crate::tools::runner::LogEventPayload {
         text: text.to_string(),
         kind: level.to_string(),
     };
     let _ = app.emit(event, payload);
-}
-
-#[derive(Clone, Serialize)]
-struct LogEventPayload {
-    text: String,
-    #[serde(rename = "type")]
-    kind: String,
-}
-
-fn format_timestamp_dir() -> String {
-    use std::time::SystemTime;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let (year, month, day, hour, minute) = unix_to_components(now);
-    format!("{year:04}-{month:02}-{day:02}-{hour:02}{minute:02}")
-}
-
-fn unix_to_components(secs: u64) -> (u32, u32, u32, u32, u32) {
-    let days = (secs / 86_400) as i64;
-    let seconds_of_day = (secs % 86_400) as u32;
-    let hour = seconds_of_day / 3600;
-    let minute = (seconds_of_day % 3600) / 60;
-    let z = days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = if m <= 2 { y + 1 } else { y };
-    (year as u32, m as u32, d as u32, hour, minute)
 }

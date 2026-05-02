@@ -27,7 +27,7 @@
   } from '$lib/api/trollstore';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
-  import { toastStore } from '$lib/stores/toastStore.svelte';
+  import { createWorkingController } from '$lib/utils/workingState.svelte';
 
   type TabId = 'actions' | 'irecovery' | 'syslog' | 'export' | 'trollstore';
   let activeTab = $state<TabId>('actions');
@@ -37,8 +37,7 @@
   let trollstoreAssets = $state<TrollStorePrepareResult | null>(null);
 
   let device = $derived(deviceStore.state);
-  let isWorking = $state(false);
-  let errorMessage = $state<string | null>(null);
+  const work = createWorkingController();
 
   let exportDir = $state('');
   let exportLabel = $state('');
@@ -64,52 +63,33 @@
     syslogUnlisten?.();
   });
 
-  async function withWorking<T>(label: string, fn: () => Promise<T>): Promise<T | null> {
-    isWorking = true;
-    errorMessage = null;
-    logStore.append(`${label}...`, 'info');
-    try {
-      const result = await fn();
-      logStore.append(`${label} ok`, 'info');
-      toastStore.success(label, 'Completed');
-      return result;
-    } catch (err) {
-      errorMessage = err instanceof Error ? err.message : String(err);
-      logStore.append(`${label} failed: ${errorMessage}`, 'stderr');
-      toastStore.error(`${label} failed`, errorMessage);
-      return null;
-    } finally {
-      isWorking = false;
-    }
-  }
-
   function udid(): string | null {
     return device.udid ?? null;
   }
 
   async function handleEnterRecovery() {
     if (!device.udid) {
-      errorMessage = 'Pair the device in Normal mode first.';
+      work.setError('Pair the device in Normal mode first.');
       return;
     }
     if (!confirm('Send the device to Recovery mode?')) return;
-    await withWorking('Enter recovery', () => enterRecovery({ udid: device.udid }));
+    await work.run('Enter recovery', () => enterRecovery({ udid: device.udid }));
   }
 
   async function handleExitRecovery() {
-    await withWorking('Exit recovery (irecovery -n)', () => exitRecovery());
+    await work.run('Exit recovery (irecovery -n)', () => exitRecovery());
   }
 
   async function handleDiagnostics(action: DiagnosticsAction) {
     const verb = action[0].toUpperCase() + action.slice(1);
     if (!confirm(`${verb} the device now?`)) return;
-    await withWorking(`Diagnostics ${action}`, () =>
+    await work.run(`Diagnostics ${action}`, () =>
       runDiagnosticsAction({ udid: udid(), action }),
     );
   }
 
   async function handlePair(action: PairAction) {
-    await withWorking(`idevicepair ${action}`, () =>
+    await work.run(`idevicepair ${action}`, () =>
       pairDevice({ udid: udid(), action }),
     );
   }
@@ -118,7 +98,7 @@
     if (action === 'deactivate' && !confirm('Deactivate the device? This requires re-activation.')) {
       return;
     }
-    const result = await withWorking(`Activation ${action}`, () =>
+    const result = await work.run(`Activation ${action}`, () =>
       runActivationAction({ udid: udid(), action }),
     );
     if (result?.state) {
@@ -128,10 +108,10 @@
 
   async function handleExport(kind: ExportInfoKind) {
     if (!exportDir.trim()) {
-      errorMessage = 'Pick an output directory first.';
+      work.setError('Pick an output directory first.');
       return;
     }
-    const result = await withWorking(`Export ${kind}`, () =>
+    const result = await work.run(`Export ${kind}`, () =>
       exportDeviceInfo({
         udid: udid(),
         outputDir: exportDir.trim(),
@@ -151,7 +131,7 @@
       );
       if (!ok) return;
     }
-    await withWorking('Clear NVRAM', () => clearNvram());
+    await work.run('Clear NVRAM', () => clearNvram());
   }
 
   async function handleRunIrecovery() {
@@ -160,10 +140,10 @@
       .map((s) => s.trim())
       .filter(Boolean);
     if (commands.length === 0) {
-      errorMessage = 'Provide at least one irecovery command (one per line).';
+      work.setError('Provide at least one irecovery command (one per line).');
       return;
     }
-    await withWorking(`irecovery (${commands.length} cmds)`, () =>
+    await work.run(`irecovery (${commands.length} cmds)`, () =>
       runIrecoveryCommands({ commands, rebootAfter }),
     );
   }
@@ -176,7 +156,7 @@
         syslogLines = [...syslogLines.slice(-(SYSLOG_MAX_LINES - 1)), event];
       });
     }
-    const result = await withWorking('Start syslog', () =>
+    const result = await work.run('Start syslog', () =>
       startSyslog({ udid: udid() }),
     );
     if (result) {
@@ -186,7 +166,7 @@
   }
 
   async function handleStopSyslog() {
-    const result = await withWorking('Stop syslog', () => stopSyslog());
+    const result = await work.run('Stop syslog', () => stopSyslog());
     if (result) {
       syslogRunning = result.running;
       syslogPid = result.pid;
@@ -198,7 +178,7 @@
   }
 
   async function handleCheckEligibility() {
-    const result = await withWorking('Check TrollStore eligibility', () =>
+    const result = await work.run('Check TrollStore eligibility', () =>
       checkTrollstoreEligibility({
         productType: device.product_type ?? null,
         iosVersion: device.ios_version ?? null,
@@ -211,10 +191,10 @@
 
   async function handlePrepareAssets() {
     if (!trollstoreSavedDir.trim()) {
-      errorMessage = 'Pick a saved directory for TrollStore assets first.';
+      work.setError('Pick a saved directory for TrollStore assets first.');
       return;
     }
-    const result = await withWorking('Prepare TrollStore assets', () =>
+    const result = await work.run('Prepare TrollStore assets', () =>
       prepareTrollstoreAssets({
         savedDir: trollstoreSavedDir.trim(),
       }),
@@ -257,8 +237,8 @@
     </div>
   </section>
 
-  {#if errorMessage}
-    <div class="error-state">{errorMessage}</div>
+  {#if work.errorMessage}
+    <div class="error-state">{work.errorMessage}</div>
   {/if}
 
   <div class="tabs" role="tablist">
@@ -293,21 +273,21 @@
     <section class="panel">
       <div class="section-title"><span>1</span><h2>Mode</h2></div>
       <div class="action-grid">
-        <button onclick={handleEnterRecovery} disabled={isWorking || device.mode !== 'Normal'}>
+        <button onclick={handleEnterRecovery} disabled={work.isWorking || device.mode !== 'Normal'}>
           Enter Recovery
           <small>From Normal mode</small>
         </button>
-        <button onclick={handleExitRecovery} disabled={isWorking}>
+        <button onclick={handleExitRecovery} disabled={work.isWorking}>
           Exit Recovery
           <small>irecovery -n (reboot)</small>
         </button>
-        <button onclick={() => handleDiagnostics('shutdown')} disabled={isWorking || device.mode !== 'Normal'}>
+        <button onclick={() => handleDiagnostics('shutdown')} disabled={work.isWorking || device.mode !== 'Normal'}>
           Shutdown
         </button>
-        <button onclick={() => handleDiagnostics('restart')} disabled={isWorking || device.mode !== 'Normal'}>
+        <button onclick={() => handleDiagnostics('restart')} disabled={work.isWorking || device.mode !== 'Normal'}>
           Restart
         </button>
-        <button onclick={() => handleDiagnostics('sleep')} disabled={isWorking || device.mode !== 'Normal'}>
+        <button onclick={() => handleDiagnostics('sleep')} disabled={work.isWorking || device.mode !== 'Normal'}>
           Sleep
         </button>
       </div>
@@ -316,13 +296,13 @@
     <section class="panel">
       <div class="section-title"><span>2</span><h2>Pairing</h2></div>
       <div class="action-grid">
-        <button onclick={() => handlePair('pair')} disabled={isWorking}>
+        <button onclick={() => handlePair('pair')} disabled={work.isWorking}>
           Pair (Trust)
         </button>
-        <button onclick={() => handlePair('validate')} disabled={isWorking}>
+        <button onclick={() => handlePair('validate')} disabled={work.isWorking}>
           Validate pairing
         </button>
-        <button class="danger" onclick={() => handlePair('unpair')} disabled={isWorking}>
+        <button class="danger" onclick={() => handlePair('unpair')} disabled={work.isWorking}>
           Unpair
         </button>
       </div>
@@ -336,13 +316,13 @@
         or <em>Jailbreak → Hacktivate</em>.
       </p>
       <div class="action-grid">
-        <button onclick={() => handleActivation('activate')} disabled={isWorking}>
+        <button onclick={() => handleActivation('activate')} disabled={work.isWorking}>
           Attempt activation
         </button>
-        <button onclick={() => handleActivation('state')} disabled={isWorking}>
+        <button onclick={() => handleActivation('state')} disabled={work.isWorking}>
           Show state
         </button>
-        <button class="danger" onclick={() => handleActivation('deactivate')} disabled={isWorking}>
+        <button class="danger" onclick={() => handleActivation('deactivate')} disabled={work.isWorking}>
           Deactivate
         </button>
       </div>
@@ -366,8 +346,8 @@
         Reboot device after running (<code>irecovery -n</code>)
       </label>
       <div class="actions">
-        <button class="primary" onclick={handleRunIrecovery} disabled={isWorking}>
-          {isWorking ? 'Working…' : 'Run'}
+        <button class="primary" onclick={handleRunIrecovery} disabled={work.isWorking}>
+          {work.isWorking ? 'Working…' : 'Run'}
         </button>
       </div>
     </section>
@@ -379,7 +359,7 @@
         <em>auto-boot=false</em> states left by tethered jailbreaks.
       </p>
       <div class="actions">
-        <button class="danger" onclick={handleClearNvram} disabled={isWorking}>
+        <button class="danger" onclick={handleClearNvram} disabled={work.isWorking}>
           Clear NVRAM
         </button>
       </div>
@@ -395,12 +375,12 @@
       </p>
       <div class="row">
         {#if !syslogRunning}
-          <button class="primary" onclick={handleStartSyslog} disabled={isWorking}>
-            {isWorking ? 'Working…' : 'Start'}
+          <button class="primary" onclick={handleStartSyslog} disabled={work.isWorking}>
+            {work.isWorking ? 'Working…' : 'Start'}
           </button>
         {:else}
-          <button class="danger" onclick={handleStopSyslog} disabled={isWorking}>
-            {isWorking ? 'Working…' : 'Stop'}
+          <button class="danger" onclick={handleStopSyslog} disabled={work.isWorking}>
+            {work.isWorking ? 'Working…' : 'Stop'}
           </button>
           <span class="status-pill" data-state="running">
             running{syslogPid ? ` · pid ${syslogPid}` : ''}
@@ -439,13 +419,13 @@
         <input bind:value={exportLabel} placeholder="device-info" />
       </label>
       <div class="actions">
-        <button onclick={() => handleExport('device-info')} disabled={isWorking}>
+        <button onclick={() => handleExport('device-info')} disabled={work.isWorking}>
           ideviceinfo
         </button>
-        <button onclick={() => handleExport('battery-info')} disabled={isWorking}>
+        <button onclick={() => handleExport('battery-info')} disabled={work.isWorking}>
           Battery (AppleSmartBattery)
         </button>
-        <button onclick={() => handleExport('diagnostics-all')} disabled={isWorking}>
+        <button onclick={() => handleExport('diagnostics-all')} disabled={work.isWorking}>
           Diagnostics All
         </button>
       </div>
@@ -466,8 +446,8 @@
         TrollStore needs iOS 14+. iOS 14/15 install via SSH ramdisk; iOS 16+ uses TrollRestore.
       </p>
       <div class="actions">
-        <button class="primary" onclick={handleCheckEligibility} disabled={isWorking}>
-          {isWorking ? 'Working…' : 'Check this device'}
+        <button class="primary" onclick={handleCheckEligibility} disabled={work.isWorking}>
+          {work.isWorking ? 'Working…' : 'Check this device'}
         </button>
       </div>
       {#if trollstoreEligibility}
@@ -503,8 +483,8 @@
         <input bind:value={trollstoreSavedDir} placeholder="/Users/you/legacykit/saved" />
       </label>
       <div class="actions">
-        <button class="primary" onclick={handlePrepareAssets} disabled={isWorking}>
-          {isWorking ? 'Working…' : 'Download / refresh assets'}
+        <button class="primary" onclick={handlePrepareAssets} disabled={work.isWorking}>
+          {work.isWorking ? 'Working…' : 'Download / refresh assets'}
         </button>
       </div>
       {#if trollstoreAssets}

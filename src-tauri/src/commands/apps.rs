@@ -4,12 +4,9 @@ use crate::models::apps::{
     ListAppsResult, UninstallAppRequest, UninstallAppResult,
 };
 use crate::platform::resolve_binary_path;
-use serde::Serialize;
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
-use std::thread;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
 #[tauri::command]
 pub async fn list_installed_apps(
@@ -20,7 +17,7 @@ pub async fn list_installed_apps(
     let scope_arg = request.scope.as_arg().to_string();
     let args = vec!["list".to_string(), scope_arg];
 
-    emit_apps_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Listing installed apps ({})", request.scope.as_arg()),
@@ -43,7 +40,7 @@ pub async fn list_installed_apps(
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let apps = parse_ideviceinstaller_list(&stdout);
-    emit_apps_log(&app, "info", &format!("Found {} app(s)", apps.len()));
+    crate::tools::runner::emit_log(&app, "info", &format!("Found {} app(s)", apps.len()));
 
     Ok(ListAppsResult {
         scope: request.scope,
@@ -76,13 +73,13 @@ pub async fn install_ipa(
 
     for path in &request.ipa_paths {
         let trimmed = path.trim().to_string();
-        emit_apps_log(&app, "info", &format!("Installing {trimmed}"));
+        crate::tools::runner::emit_log(&app, "info", &format!("Installing {trimmed}"));
         let args = vec!["install".to_string(), trimmed.clone()];
-        run_process_streaming(&app, binary.clone(), &args)?;
+        crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
         installed.push(trimmed);
     }
 
-    emit_apps_log(&app, "info", &format!("Installed {} IPA(s)", installed.len()));
+    crate::tools::runner::emit_log(&app, "info", &format!("Installed {} IPA(s)", installed.len()));
     Ok(InstallIpaResult { installed })
 }
 
@@ -98,9 +95,9 @@ pub async fn uninstall_app(
 
     let binary = resolve_binary_path(&app, "ideviceinstaller").map_err(AppError::CommandFailed)?;
     let args = vec!["uninstall".to_string(), bundle_id.to_string()];
-    emit_apps_log(&app, "info", &format!("Uninstalling {bundle_id}"));
-    run_process_streaming(&app, binary, &args)?;
-    emit_apps_log(&app, "info", &format!("Uninstalled {bundle_id}"));
+    crate::tools::runner::emit_log(&app, "info", &format!("Uninstalling {bundle_id}"));
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
+    crate::tools::runner::emit_log(&app, "info", &format!("Uninstalled {bundle_id}"));
 
     Ok(UninstallAppResult {
         bundle_id: bundle_id.to_string(),
@@ -165,71 +162,6 @@ fn split_csv_row(row: &str) -> Vec<String> {
     }
     fields.push(current);
     fields
-}
-
-fn run_process_streaming(
-    app: &AppHandle,
-    binary: PathBuf,
-    args: &[String],
-) -> Result<(), AppError> {
-    let mut child = Command::new(&binary)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stdout".to_string()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stderr".to_string()))?;
-
-    let stdout_app = app.clone();
-    let stdout_thread = thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_apps_log(&stdout_app, "stdout", &line);
-        }
-    });
-
-    let stderr_app = app.clone();
-    let stderr_thread = thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_apps_log(&stderr_app, "stderr", &line);
-        }
-    });
-
-    let status = child.wait()?;
-    let _ = stdout_thread.join();
-    let _ = stderr_thread.join();
-
-    if !status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "{} exited with status {}",
-            binary.display(),
-            status
-        )));
-    }
-    Ok(())
-}
-
-fn emit_apps_log(app: &AppHandle, level: &str, text: &str) {
-    let payload = LogEventPayload {
-        text: text.to_string(),
-        kind: level.to_string(),
-    };
-    let _ = app.emit("log_event", payload);
-}
-
-#[derive(Clone, Serialize)]
-struct LogEventPayload {
-    text: String,
-    #[serde(rename = "type")]
-    kind: String,
 }
 
 // Suppress unused-variant warnings; AppListScope is round-tripped through the type.

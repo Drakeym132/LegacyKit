@@ -9,7 +9,7 @@
   } from '$lib/api/shsh';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
-  import { toastStore } from '$lib/stores/toastStore.svelte';
+  import { createWorkingController } from '$lib/utils/workingState.svelte';
 
   type Tab = 'save' | 'cydia' | 'onboard' | 'library';
 
@@ -34,33 +34,13 @@
   let dumpOutputPath = $state('');
 
   let blobs = $state<SavedBlob[]>([]);
-  let isWorking = $state(false);
-  let errorMessage = $state<string | null>(null);
+  const work = createWorkingController();
 
   $effect(() => {
     if (device.product_type && !saveDeviceType) saveDeviceType = device.product_type;
     if (device.ecid && !saveEcid) saveEcid = device.ecid;
     if (device.ios_version && !saveVersion) saveVersion = device.ios_version;
   });
-
-  async function withWorking<T>(label: string, fn: () => Promise<T>): Promise<T | null> {
-    isWorking = true;
-    errorMessage = null;
-    logStore.append(`${label}...`, 'info');
-    try {
-      const result = await fn();
-      logStore.append(`${label} ok`, 'info');
-      toastStore.success(label, 'Completed');
-      return result;
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : String(error);
-      logStore.append(`${label} failed: ${errorMessage}`, 'stderr');
-      toastStore.error(`${label} failed`, errorMessage);
-      return null;
-    } finally {
-      isWorking = false;
-    }
-  }
 
   function nullable(value: string): string | null {
     const trimmed = value.trim();
@@ -69,10 +49,10 @@
 
   async function handleSave() {
     if (!savedDir.trim()) {
-      errorMessage = 'Output directory is required.';
+      work.setError('Output directory is required.');
       return;
     }
-    const result = await withWorking('Save SHSH (tsschecker)', () =>
+    const result = await work.run('Save SHSH (tsschecker)', () =>
       saveShshBlob({
         deviceType: saveDeviceType.trim(),
         deviceEcid: saveEcid.trim(),
@@ -93,15 +73,15 @@
 
   async function handleCydia() {
     if (!savedDir.trim()) {
-      errorMessage = 'Output directory is required.';
+      work.setError('Output directory is required.');
       return;
     }
     const buildIds = cydiaBuilds.split(/[\s,]+/).map((b) => b.trim()).filter(Boolean);
     if (buildIds.length === 0) {
-      errorMessage = 'Provide at least one build ID (space- or comma-separated).';
+      work.setError('Provide at least one build ID (space- or comma-separated).');
       return;
     }
-    const result = await withWorking('Fetch Cydia blobs', () =>
+    const result = await work.run('Fetch Cydia blobs', () =>
       fetchCydiaBlobs({
         deviceType: saveDeviceType.trim(),
         deviceEcid: saveEcid.trim(),
@@ -121,7 +101,7 @@
   }
 
   async function handleDump() {
-    const result = await withWorking('Convert raw dump to SHSH', () =>
+    const result = await work.run('Convert raw dump to SHSH', () =>
       dumpOnboardBlob({
         rawDumpPath: dumpRawPath.trim(),
         outputPath: dumpOutputPath.trim(),
@@ -138,7 +118,7 @@
       blobs = [];
       return;
     }
-    const result = await withWorking('List saved blobs', () =>
+    const result = await work.run('List saved blobs', () =>
       listSavedBlobs({ directory: savedDir.trim() }),
     );
     if (result) {
@@ -181,8 +161,8 @@
     </div>
   </section>
 
-  {#if errorMessage}
-    <div class="error-state">{errorMessage}</div>
+  {#if work.errorMessage}
+    <div class="error-state">{work.errorMessage}</div>
   {/if}
 
   <section class="panel">
@@ -251,8 +231,8 @@
       </div>
 
       <div class="actions">
-        <button class="primary" onclick={handleSave} disabled={isWorking}>
-          {isWorking ? 'Working…' : 'Save blob'}
+        <button class="primary" onclick={handleSave} disabled={work.isWorking}>
+          {work.isWorking ? 'Working…' : 'Save blob'}
         </button>
       </div>
     </section>
@@ -281,8 +261,8 @@
       </label>
 
       <div class="actions">
-        <button class="primary" onclick={handleCydia} disabled={isWorking}>
-          {isWorking ? 'Working…' : 'Try Cydia'}
+        <button class="primary" onclick={handleCydia} disabled={work.isWorking}>
+          {work.isWorking ? 'Working…' : 'Try Cydia'}
         </button>
       </div>
 
@@ -326,8 +306,8 @@
       </label>
 
       <div class="actions">
-        <button class="primary" onclick={handleDump} disabled={isWorking}>
-          {isWorking ? 'Working…' : 'Convert with img4tool'}
+        <button class="primary" onclick={handleDump} disabled={work.isWorking}>
+          {work.isWorking ? 'Working…' : 'Convert with img4tool'}
         </button>
       </div>
     </section>
@@ -339,7 +319,7 @@
         tsschecker's <code>ECID_DEVICE_BOARD_VERSION-BUILD_NONCE</code> convention are parsed automatically.
       </p>
       <div class="actions">
-        <button class="secondary" onclick={refreshLibrary} disabled={isWorking}>
+        <button class="secondary" onclick={refreshLibrary} disabled={work.isWorking}>
           Refresh
         </button>
       </div>

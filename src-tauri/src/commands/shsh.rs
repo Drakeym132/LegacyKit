@@ -5,14 +5,11 @@ use crate::models::shsh::{
 };
 use crate::platform::resolve_binary_path;
 use crate::services::shsh_store;
-use serde::Serialize;
 use std::ffi::OsStr;
 use std::fs;
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
-use std::thread;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
 const CYDIA_TSS_URL: &str = "http://cydia.saurik.com/TSS/controller?action=2/";
 
@@ -98,7 +95,7 @@ pub async fn save_shsh_blob(
     }
 
     let binary = resolve_binary_path(&app, "tsschecker").map_err(AppError::CommandFailed)?;
-    emit_shsh_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!(
@@ -107,7 +104,7 @@ pub async fn save_shsh_blob(
     );
 
     let blobs_before = collect_blob_paths(Path::new(&output_dir));
-    run_process_streaming(&app, binary.clone(), &args)?;
+    crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
     let blobs_after = collect_blob_paths(Path::new(&output_dir));
 
     let new_blobs: Vec<String> = blobs_after
@@ -121,7 +118,7 @@ pub async fn save_shsh_blob(
         ));
     }
 
-    emit_shsh_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Saved {} blob file(s)", new_blobs.len()),
@@ -158,7 +155,7 @@ pub async fn fetch_cydia_blobs(
             continue;
         }
 
-        emit_shsh_log(&app, "info", &format!("Trying Cydia blobs for {build}..."));
+        crate::tools::runner::emit_log(&app, "info", &format!("Trying Cydia blobs for {build}..."));
         let args = vec![
             "-d".to_string(),
             device_type.clone(),
@@ -194,7 +191,7 @@ pub async fn fetch_cydia_blobs(
                                 Err(_) => found,
                             }
                         };
-                        emit_shsh_log(
+                        crate::tools::runner::emit_log(
                             &app,
                             "info",
                             &format!("Saved Cydia blobs for {build}: {final_path}"),
@@ -207,7 +204,7 @@ pub async fn fetch_cydia_blobs(
                         });
                     }
                     None => {
-                        emit_shsh_log(
+                        crate::tools::runner::emit_log(
                             &app,
                             "warn",
                             &format!("No Cydia blobs available for {build}"),
@@ -222,7 +219,7 @@ pub async fn fetch_cydia_blobs(
                 }
             }
             Err(err) => {
-                emit_shsh_log(
+                crate::tools::runner::emit_log(
                     &app,
                     "stderr",
                     &format!("tsschecker failed for {build}: {err}"),
@@ -275,12 +272,12 @@ pub async fn dump_onboard_blob(
     ];
 
     let binary = resolve_binary_path(&app, "img4tool").map_err(AppError::CommandFailed)?;
-    emit_shsh_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Converting raw dump to SHSH: {raw_path}"),
     );
-    run_process_streaming(&app, binary, &args)?;
+    crate::tools::runner::run_streaming(&app, binary, &args)?;
 
     let metadata = fs::metadata(output_path)
         .map_err(|e| AppError::CommandFailed(format!("Output blob not created: {e}")))?;
@@ -291,7 +288,7 @@ pub async fn dump_onboard_blob(
         ));
     }
 
-    emit_shsh_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Onboard blob written to {output_path}"),
@@ -342,57 +339,6 @@ fn collect_blob_paths(dir: &Path) -> Vec<String> {
         .collect()
 }
 
-fn run_process_streaming(
-    app: &AppHandle,
-    binary: PathBuf,
-    args: &[String],
-) -> Result<(), AppError> {
-    let mut child = Command::new(&binary)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stdout".to_string()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stderr".to_string()))?;
-
-    let stdout_app = app.clone();
-    let stdout_thread = thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_shsh_log(&stdout_app, "stdout", &line);
-        }
-    });
-
-    let stderr_app = app.clone();
-    let stderr_thread = thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_shsh_log(&stderr_app, "stderr", &line);
-        }
-    });
-
-    let status = child.wait()?;
-    let _ = stdout_thread.join();
-    let _ = stderr_thread.join();
-
-    if !status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "{} exited with status {}",
-            binary.display(),
-            status
-        )));
-    }
-
-    Ok(())
-}
-
 fn run_process_capturing(binary: &Path, args: &[String]) -> Result<(), AppError> {
     let output = Command::new(binary)
         .args(args)
@@ -408,19 +354,4 @@ fn run_process_capturing(binary: &Path, args: &[String]) -> Result<(), AppError>
         }));
     }
     Ok(())
-}
-
-fn emit_shsh_log(app: &AppHandle, level: &str, text: &str) {
-    let payload = LogEventPayload {
-        text: text.to_string(),
-        kind: level.to_string(),
-    };
-    let _ = app.emit("log_event", payload);
-}
-
-#[derive(Clone, Serialize)]
-struct LogEventPayload {
-    text: String,
-    #[serde(rename = "type")]
-    kind: String,
 }

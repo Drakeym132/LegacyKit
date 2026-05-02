@@ -1,11 +1,8 @@
 use crate::error::AppError;
 use crate::platform::resolve_binary_path;
 use serde::{Deserialize, Serialize};
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::thread;
-use tauri::{AppHandle, Emitter};
+use std::path::Path;
+use tauri::AppHandle;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,13 +42,13 @@ pub async fn run_gaster(
     let binary = resolve_binary_path(&app, "gaster").map_err(AppError::CommandFailed)?;
     let args = vec![request.action.as_arg().to_string()];
 
-    emit_jailbreak_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Running gaster {}...", request.action.as_arg()),
     );
-    run_process_streaming(&app, binary.clone(), &args)?;
-    emit_jailbreak_log(&app, "info", "gaster finished");
+    crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
+    crate::tools::runner::emit_log(&app, "info", "gaster finished");
 
     Ok(GasterResult {
         action: request.action,
@@ -108,13 +105,13 @@ pub async fn run_kloader(
     }
 
     let binary = resolve_binary_path(&app, "kloader").map_err(AppError::CommandFailed)?;
-    emit_jailbreak_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!("Booting patched components with kloader: {}", args.join(" ")),
     );
-    run_process_streaming(&app, binary.clone(), &args)?;
-    emit_jailbreak_log(&app, "info", "kloader finished");
+    crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
+    crate::tools::runner::emit_log(&app, "info", "kloader finished");
 
     Ok(KloaderResult {
         binary: binary.to_string_lossy().to_string(),
@@ -164,82 +161,16 @@ async fn run_untether(
         .collect();
 
     let binary = resolve_binary_path(app, binary_name).map_err(AppError::CommandFailed)?;
-    emit_jailbreak_log(
+    crate::tools::runner::emit_log(
         app,
         "info",
         &format!("Running {} {}", binary_name, args.join(" ")),
     );
-    run_process_streaming(app, binary.clone(), &args)?;
-    emit_jailbreak_log(app, "info", &format!("{binary_name} finished"));
+    crate::tools::runner::run_streaming(app, binary.clone(), &args)?;
+    crate::tools::runner::emit_log(app, "info", &format!("{binary_name} finished"));
 
     Ok(UntetherResult {
         binary: binary.to_string_lossy().to_string(),
         args,
     })
-}
-
-fn run_process_streaming(
-    app: &AppHandle,
-    binary: PathBuf,
-    args: &[String],
-) -> Result<(), AppError> {
-    let mut child = Command::new(&binary)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stdout".to_string()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::CommandFailed("Failed to capture process stderr".to_string()))?;
-
-    let stdout_app = app.clone();
-    let stdout_thread = thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_jailbreak_log(&stdout_app, "stdout", &line);
-        }
-    });
-
-    let stderr_app = app.clone();
-    let stderr_thread = thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines().map_while(Result::ok) {
-            emit_jailbreak_log(&stderr_app, "stderr", &line);
-        }
-    });
-
-    let status = child.wait()?;
-    let _ = stdout_thread.join();
-    let _ = stderr_thread.join();
-
-    if !status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "{} exited with status {}",
-            binary.display(),
-            status
-        )));
-    }
-
-    Ok(())
-}
-
-fn emit_jailbreak_log(app: &AppHandle, level: &str, text: &str) {
-    let payload = LogEventPayload {
-        text: text.to_string(),
-        kind: level.to_string(),
-    };
-    let _ = app.emit("log_event", payload);
-}
-
-#[derive(Clone, Serialize)]
-struct LogEventPayload {
-    text: String,
-    #[serde(rename = "type")]
-    kind: String,
 }

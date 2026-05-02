@@ -1,4 +1,5 @@
 pub mod bootchain;
+pub mod device_parser;
 pub mod ipsw_prep;
 pub mod just_boot_store;
 pub mod restore_options;

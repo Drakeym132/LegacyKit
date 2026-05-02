@@ -11,8 +11,7 @@
   import { runKloader } from '$lib/api/jailbreak';
   import { recordJustBoot } from '$lib/api/justBoot';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
-  import { logStore } from '$lib/stores/logStore.svelte';
-  import { toastStore } from '$lib/stores/toastStore.svelte';
+  import { createWorkingController } from '$lib/utils/workingState.svelte';
 
   let ipswPath = $state('');
   let outputDir = $state('');
@@ -35,8 +34,7 @@
   let patchedIbec = $state('');
   let patchedKernel = $state('');
 
-  let isWorking = $state(false);
-  let errorMessage = $state<string | null>(null);
+  const work = createWorkingController();
 
   let productType = $derived(deviceStore.state.product_type);
   let processorGen = $derived(inferProcessorGen(productType));
@@ -62,32 +60,12 @@
     return `${dir}/${name}`;
   }
 
-  async function withWorking<T>(label: string, fn: () => Promise<T>): Promise<T | null> {
-    isWorking = true;
-    errorMessage = null;
-    logStore.append(`${label}...`, 'info');
-    try {
-      const result = await fn();
-      logStore.append(`${label} ok`, 'info');
-      toastStore.success(label, 'Completed');
-      return result;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      errorMessage = msg;
-      logStore.append(`${label} failed: ${msg}`, 'stderr');
-      toastStore.error(`${label} failed`, msg);
-      return null;
-    } finally {
-      isWorking = false;
-    }
-  }
-
   async function handleExtractAll() {
     if (!ipswPath || !outputDir) {
-      errorMessage = 'Source IPSW and output directory are required.';
+      work.setError('Source IPSW and output directory are required.');
       return;
     }
-    const result = await withWorking('Extract all IPSW components', async () => {
+    const result = await work.run('Extract all IPSW components', async () => {
       const [ibss, ibec, kernel, ramdisk] = await Promise.all([
         extractIpswComponent({ ipswPath, componentPath: ibssIpswPath, outputPath: joinOut('iBSS.dec') }),
         extractIpswComponent({ ipswPath, componentPath: ibecIpswPath, outputPath: joinOut('iBEC.dec') }),
@@ -104,10 +82,10 @@
 
   async function handlePatchIboot() {
     if (!extractedIbss) {
-      errorMessage = 'Extract iBSS first.';
+      work.setError('Extract iBSS first.');
       return;
     }
-    const result = await withWorking('Patch iBSS', async () => {
+    const result = await work.run('Patch iBSS', async () => {
       const patched = await patchIboot({
         inputPath: extractedIbss,
         outputPath: joinOut('iBSS.patched.bin'),
@@ -123,10 +101,10 @@
 
   async function handlePatchIbec() {
     if (!extractedIbec) {
-      errorMessage = 'Extract iBEC first.';
+      work.setError('Extract iBEC first.');
       return;
     }
-    const result = await withWorking('Patch iBEC', async () => {
+    const result = await work.run('Patch iBEC', async () => {
       const patched = await patchIboot({
         inputPath: extractedIbec,
         outputPath: joinOut('iBEC.patched.bin'),
@@ -142,10 +120,10 @@
 
   async function handlePatchKernel() {
     if (!extractedKernel) {
-      errorMessage = 'Extract kernel first.';
+      work.setError('Extract kernel first.');
       return;
     }
-    const result = await withWorking('Patch kernel', async () => {
+    const result = await work.run('Patch kernel', async () => {
       const patched = await patchKernel({
         inputPath: extractedKernel,
         outputPath: joinOut('kernelcache.patched.bin'),
@@ -159,10 +137,10 @@
 
   async function handleRepackComponent(component: 'ibss' | 'ibec' | 'kernel', inputPath: string, outputName: string) {
     if (!shshPath) {
-      errorMessage = 'SHSH blob path is required for repacking.';
+      work.setError('SHSH blob path is required for repacking.');
       return null;
     }
-    const result = await withWorking(`Repack ${component}`, async () => {
+    const result = await work.run(`Repack ${component}`, async () => {
       if (processorGen !== null && processorGen >= 7) {
         const repacked = await packImg4({ im4pPath: inputPath, shshPath, outputPath: joinOut(outputName), im4mPath: null });
         return repacked.outputPath;
@@ -176,10 +154,10 @@
 
   async function handleRepackAll() {
     if (!patchedIbss) {
-      errorMessage = 'Patch iBSS first.';
+      work.setError('Patch iBSS first.');
       return;
     }
-    const result = await withWorking('Repack all components', async () => {
+    const result = await work.run('Repack all components', async () => {
       const [ibss, ibec, kernel] = await Promise.all([
         handleRepackComponent('ibss', patchedIbss, 'iBSS.repacked'),
         patchedIbec ? handleRepackComponent('ibec', patchedIbec, 'iBEC.repacked') : Promise.resolve(null),
@@ -194,10 +172,10 @@
 
   async function handleModifyRamdisk() {
     if (!extractedRamdisk || !sshBinariesDir) {
-      errorMessage = 'Extracted ramdisk and SSH binaries directory are required.';
+      work.setError('Extracted ramdisk and SSH binaries directory are required.');
       return;
     }
-    const result = await withWorking('Modify ramdisk', async () => {
+    const result = await work.run('Modify ramdisk', async () => {
       const modified = await modifyRamdisk({
         ramdiskPath: extractedRamdisk,
         action: 'resize',
@@ -212,7 +190,7 @@
 
   async function handleBoot() {
     if (!patchedIbss) {
-      errorMessage = 'Patched iBSS is required for kloader.';
+      work.setError('Patched iBSS is required for kloader.');
       return;
     }
     
@@ -236,7 +214,7 @@
       }
     }
     
-    await withWorking('Booting via kloader', () =>
+    await work.run('Booting via kloader', () =>
       runKloader({ ibssPath: patchedIbss, ibecPath: patchedIbec || null })
     );
   }
@@ -330,7 +308,7 @@
     </label>
 
     <div class="actions">
-      <button class="secondary" onclick={handleExtractAll} disabled={isWorking || !ipswPath || !outputDir}>Extract all</button>
+      <button class="secondary" onclick={handleExtractAll} disabled={work.isWorking || !ipswPath || !outputDir}>Extract all</button>
     </div>
   </section>
 
@@ -339,9 +317,9 @@
     <p>Patch the extracted components with your custom boot arguments.</p>
 
     <div class="actions">
-      <button class="secondary" onclick={handlePatchIboot} disabled={isWorking || !extractedIbss}>Patch iBSS</button>
-      <button class="secondary" onclick={handlePatchIbec} disabled={isWorking || !extractedIbec}>Patch iBEC</button>
-      <button class="secondary" onclick={handlePatchKernel} disabled={isWorking || !extractedKernel}>Patch kernel</button>
+      <button class="secondary" onclick={handlePatchIboot} disabled={work.isWorking || !extractedIbss}>Patch iBSS</button>
+      <button class="secondary" onclick={handlePatchIbec} disabled={work.isWorking || !extractedIbec}>Patch iBEC</button>
+      <button class="secondary" onclick={handlePatchKernel} disabled={work.isWorking || !extractedKernel}>Patch kernel</button>
     </div>
   </section>
 
@@ -350,7 +328,7 @@
     <p>Repack the patched components with your SHSH blob.</p>
 
     <div class="actions">
-      <button class="secondary" onclick={handleRepackAll} disabled={isWorking || !patchedIbss || !shshPath}>Repack all</button>
+      <button class="secondary" onclick={handleRepackAll} disabled={work.isWorking || !patchedIbss || !shshPath}>Repack all</button>
     </div>
   </section>
 
@@ -359,7 +337,7 @@
     <p>Inject SSH binaries into the ramdisk.</p>
 
     <div class="actions">
-      <button class="secondary" onclick={handleModifyRamdisk} disabled={isWorking || !extractedRamdisk || !sshBinariesDir}>Modify ramdisk</button>
+      <button class="secondary" onclick={handleModifyRamdisk} disabled={work.isWorking || !extractedRamdisk || !sshBinariesDir}>Modify ramdisk</button>
     </div>
   </section>
 
@@ -368,16 +346,16 @@
     <p>Boot the device with kloader using the patched and repacked components.</p>
 
     <div class="actions">
-      <button class="primary" onclick={handleBoot} disabled={isWorking || (mode !== 'DFU' && mode !== 'pwnDFU')}>
+      <button class="primary" onclick={handleBoot} disabled={work.isWorking || (mode !== 'DFU' && mode !== 'pwnDFU')}>
         kloader iBSS &rarr; iBEC
       </button>
     </div>
   </section>
 
-  {#if errorMessage}
+  {#if work.errorMessage}
     <section class="panel error-panel">
       <h2>Error</h2>
-      <p>{errorMessage}</p>
+      <p>{work.errorMessage}</p>
     </section>
   {/if}
 </div>

@@ -2,16 +2,15 @@ use crate::error::AppError;
 use crate::models::just_boot::{JustBootEntry, JustBootEntryInput, PrepareAndJustBootRequest};
 use crate::services::{bootchain, just_boot_store};
 use chrono::{DateTime, Utc};
-use serde::Serialize;
 use std::fs;
 use std::path::Path;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
 #[tauri::command]
 pub async fn list_just_boot_history(app: AppHandle) -> Result<Vec<JustBootEntry>, AppError> {
     let mut entries = just_boot_store::list(&app)?;
-    entries.sort_by(|a, b| parse_rfc3339(&b.last_booted_at).cmp(&parse_rfc3339(&a.last_booted_at)));
+    entries.sort_by_key(|entry| std::cmp::Reverse(parse_rfc3339(&entry.last_booted_at)));
     Ok(entries)
 }
 
@@ -96,7 +95,7 @@ pub async fn prepare_and_just_boot(
         .join(format!("ramdisk_{build_id}"));
     fs::create_dir_all(&cache_dir)?;
 
-    emit_log(
+    crate::tools::runner::emit_log(
         &app,
         "info",
         &format!(
@@ -218,7 +217,7 @@ fn infer_processor_generation(product_type: &str) -> Option<u8> {
 }
 
 fn matches_any(value: &str, candidates: &[&str]) -> bool {
-    candidates.iter().any(|candidate| value == *candidate)
+    candidates.contains(&value)
 }
 
 fn product_family_in(
@@ -237,19 +236,4 @@ fn product_family_in(
         .parse::<u8>()
         .map(|value| range.contains(&value))
         .unwrap_or(false)
-}
-
-fn emit_log(app: &AppHandle, level: &str, text: &str) {
-    let payload = LogEventPayload {
-        text: text.to_string(),
-        kind: level.to_string(),
-    };
-    let _ = app.emit("log_event", payload);
-}
-
-#[derive(Clone, Serialize)]
-struct LogEventPayload {
-    text: String,
-    #[serde(rename = "type")]
-    kind: String,
 }

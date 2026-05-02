@@ -11,14 +11,13 @@
   } from '$lib/api/data';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
-  import { toastStore } from '$lib/stores/toastStore.svelte';
+  import { createWorkingController } from '$lib/utils/workingState.svelte';
 
   type Tab = 'backup' | 'restore' | 'encryption' | 'erase';
 
   let activeTab = $state<Tab>('backup');
   let backupRoot = $state('');
-  let isWorking = $state(false);
-  let errorMessage = $state<string | null>(null);
+  const work = createWorkingController();
 
   let device = $derived(deviceStore.state);
   let udid = $derived(device.udid ?? '');
@@ -33,31 +32,12 @@
 
   let eraseConfirmation = $state('');
 
-  async function withWorking<T>(label: string, fn: () => Promise<T>): Promise<T | null> {
-    isWorking = true;
-    errorMessage = null;
-    logStore.append(`${label}...`, 'info');
-    try {
-      const result = await fn();
-      logStore.append(`${label} ok`, 'info');
-      toastStore.success(label, 'Completed');
-      return result;
-    } catch (err) {
-      errorMessage = err instanceof Error ? err.message : String(err);
-      logStore.append(`${label} failed: ${errorMessage}`, 'stderr');
-      toastStore.error(`${label} failed`, errorMessage);
-      return null;
-    } finally {
-      isWorking = false;
-    }
-  }
-
   async function refreshBackups() {
     if (!backupRoot.trim()) {
       backups = [];
       return;
     }
-    const result = await withWorking('List backups', () =>
+    const result = await work.run('List backups', () =>
       listBackups({ backupRoot: backupRoot.trim() }),
     );
     if (result) {
@@ -67,10 +47,10 @@
 
   async function handleBackup() {
     if (!backupRoot.trim()) {
-      errorMessage = 'Backup root directory is required.';
+      work.setError('Backup root directory is required.');
       return;
     }
-    const result = await withWorking('Create backup', () =>
+    const result = await work.run('Create backup', () =>
       createBackup({
         backupRoot: backupRoot.trim(),
         udid: udid || null,
@@ -85,10 +65,10 @@
 
   async function handleRestore() {
     if (!selectedBackup.trim()) {
-      errorMessage = 'Select a backup to restore.';
+      work.setError('Select a backup to restore.');
       return;
     }
-    const result = await withWorking('Restore backup', () =>
+    const result = await work.run('Restore backup', () =>
       restoreBackup({
         backupPath: selectedBackup,
         udid: udid || null,
@@ -107,19 +87,19 @@
       action === 'on' ? 'Enable backup encryption'
       : action === 'off' ? 'Disable backup encryption'
       : 'Change backup password';
-    await withWorking(label, () => setBackupEncryption({ action, udid: udid || null }));
+    await work.run(label, () => setBackupEncryption({ action, udid: udid || null }));
   }
 
   async function handleErase() {
     if (eraseConfirmation !== ERASE_CONFIRMATION) {
-      errorMessage = `Type the exact phrase to confirm: ${ERASE_CONFIRMATION}`;
+      work.setError(`Type the exact phrase to confirm: ${ERASE_CONFIRMATION}`);
       return;
     }
     const ok = confirm(
       'This will erase ALL content and settings on the device. This cannot be undone. Continue?',
     );
     if (!ok) return;
-    const result = await withWorking('Erase device', () =>
+    const result = await work.run('Erase device', () =>
       eraseDevice({ udid: udid || null, confirmation: eraseConfirmation }),
     );
     if (result) {
@@ -164,8 +144,8 @@
     </div>
   </section>
 
-  {#if errorMessage}
-    <div class="error-state">{errorMessage}</div>
+  {#if work.errorMessage}
+    <div class="error-state">{work.errorMessage}</div>
   {/if}
 
   <section class="panel">
@@ -202,8 +182,8 @@
         <span>Full backup (<code>--full</code>)</span>
       </label>
       <div class="actions">
-        <button class="primary" onclick={handleBackup} disabled={isWorking}>
-          {isWorking ? 'Working…' : 'Start backup'}
+        <button class="primary" onclick={handleBackup} disabled={work.isWorking}>
+          {work.isWorking ? 'Working…' : 'Start backup'}
         </button>
       </div>
     </section>
@@ -216,7 +196,7 @@
       </p>
 
       <div class="actions" style="margin-bottom: var(--spacing-md);">
-        <button class="secondary" onclick={refreshBackups} disabled={isWorking}>
+        <button class="secondary" onclick={refreshBackups} disabled={work.isWorking}>
           Refresh list
         </button>
       </div>
@@ -269,9 +249,9 @@
         <button
           class="primary"
           onclick={handleRestore}
-          disabled={isWorking || !selectedBackup}
+          disabled={work.isWorking || !selectedBackup}
         >
-          {isWorking ? 'Working…' : 'Restore'}
+          {work.isWorking ? 'Working…' : 'Restore'}
         </button>
       </div>
     </section>
@@ -283,13 +263,13 @@
         on the device for the existing/new password.
       </p>
       <div class="actions">
-        <button class="secondary" onclick={() => handleEncryption('on')} disabled={isWorking}>
+        <button class="secondary" onclick={() => handleEncryption('on')} disabled={work.isWorking}>
           Enable encryption
         </button>
-        <button class="secondary" onclick={() => handleEncryption('off')} disabled={isWorking}>
+        <button class="secondary" onclick={() => handleEncryption('off')} disabled={work.isWorking}>
           Disable encryption
         </button>
-        <button class="secondary" onclick={() => handleEncryption('changePassword')} disabled={isWorking}>
+        <button class="secondary" onclick={() => handleEncryption('changePassword')} disabled={work.isWorking}>
           Change password
         </button>
       </div>
@@ -313,9 +293,9 @@
         <button
           class="danger"
           onclick={handleErase}
-          disabled={isWorking || eraseConfirmation !== ERASE_CONFIRMATION}
+          disabled={work.isWorking || eraseConfirmation !== ERASE_CONFIRMATION}
         >
-          {isWorking ? 'Working…' : 'Erase device'}
+          {work.isWorking ? 'Working…' : 'Erase device'}
         </button>
       </div>
     </section>
