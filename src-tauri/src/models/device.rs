@@ -51,4 +51,6 @@ pub struct DeviceInfo {
     pub ibfl: Option<String>,
     pub apnonce: Option<String>,
     pub sepnonce: Option<String>,
+    pub pwnd: Option<String>,
+    pub srtg: Option<String>,
 }

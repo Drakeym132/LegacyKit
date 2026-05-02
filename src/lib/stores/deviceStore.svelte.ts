@@ -38,6 +38,8 @@ export interface DeviceInfo {
     ibfl: string | null;
     apnonce: string | null;
     sepnonce: string | null;
+    pwnd: string | null;
+    srtg: string | null;
 }
 
 const EMPTY_DEVICE_INFO: DeviceInfo = {
@@ -77,7 +79,9 @@ const EMPTY_DEVICE_INFO: DeviceInfo = {
     bdid: null,
     ibfl: null,
     apnonce: null,
-    sepnonce: null
+    sepnonce: null,
+    pwnd: null,
+    srtg: null
 };
 
 class DeviceStore {
@@ -89,6 +93,10 @@ class DeviceStore {
 
     setDevice(info: Partial<DeviceInfo>) {
         this.state = { ...this.state, ...info, connected: true };
+    }
+
+    optimisticallySetMode(mode: DeviceMode, pwnd: string | null = null) {
+        this.state = { ...this.state, mode, pwnd: pwnd ?? this.state.pwnd };
     }
 
     clearDevice() {

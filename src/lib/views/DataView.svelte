@@ -124,7 +124,6 @@
 <div class="view">
   <div class="view-header">
     <div>
-      <h1>Data Management</h1>
       <p>Back up, restore, and erase the device via <code>idevicebackup2</code>.</p>
     </div>
   </div>
@@ -309,12 +308,6 @@
 
 <style>
   .view-header { margin-bottom: var(--spacing-lg); }
-  .view-header h1 {
-    color: var(--color-text-primary);
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 var(--spacing-xs);
-  }
   .view-header p {
     color: var(--color-text-secondary);
     font-size: 0.9rem;

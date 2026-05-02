@@ -140,7 +140,6 @@
 <div class="view">
   <div class="view-header">
     <div>
-      <h1>SHSH Blobs</h1>
       <p>Save, fetch, dump, and organize signing tickets used for downgrades and tethered restores.</p>
     </div>
   </div>
@@ -343,12 +342,6 @@
 <style>
 
   .view-header { margin-bottom: var(--spacing-lg); }
-  .view-header h1 {
-    color: var(--color-text-primary);
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 var(--spacing-xs);
-  }
   .view-header p {
     color: var(--color-text-secondary);
     font-size: 0.9rem;

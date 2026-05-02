@@ -219,7 +219,6 @@
 <div class="view">
   <div class="view-header">
     <div>
-      <h1>SSH Ramdisk</h1>
       <p>Build and boot a custom SSH ramdisk in stages. Each step writes its output to your output directory and feeds the next.</p>
     </div>
   </div>
@@ -397,13 +396,6 @@
 <style>
   .view-header {
     margin-bottom: var(--spacing-lg);
-  }
-
-  .view-header h1 {
-    color: var(--color-text-primary);
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 var(--spacing-xs);
   }
 
   .view-header p {

@@ -8,6 +8,7 @@
   } from '$lib/api/jailbreak';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
+  import { inferProcessorGen } from '$lib/utils/processorGen';
 
   type UntetherTool = 'g1lbertJB' | 'evasi0n';
 
@@ -22,18 +23,6 @@
   let isCheckm8Eligible = $derived(processorGen !== null && processorGen >= 7 && processorGen <= 10);
   let isG1lbertEligible = $derived(processorGen !== null && processorGen >= 4 && processorGen <= 5);
   let isEvasi0nEligible = $derived(processorGen !== null && processorGen >= 5 && processorGen <= 6);
-
-  function inferProcessorGen(product: string | null): number | null {
-    if (!product) return null;
-    if (/^iPhone3,/.test(product) || product === 'iPad1,1' || product === 'iPod4,1') return 4;
-    if (product === 'iPhone4,1' || /^iPad2,/.test(product) || /^iPad3,[1-3]/.test(product) || product === 'iPod5,1') return 5;
-    if (/^iPhone5,/.test(product) || /^iPad3,[4-6]/.test(product)) return 6;
-    if (/^iPhone6,/.test(product) || /^iPad4,/.test(product)) return 7;
-    if (/^iPhone7,/.test(product) || product === 'iPod7,1' || /^iPad5,/.test(product)) return 8;
-    if (/^iPhone8,/.test(product) || /^iPad6,/.test(product)) return 9;
-    if (/^iPhone9,/.test(product) || /^iPad7,/.test(product)) return 10;
-    return null;
-  }
 
   async function handleGaster(action: GasterAction) {
     isWorking = true;
@@ -77,7 +66,6 @@
 <div class="view">
   <div class="view-header">
     <div>
-      <h1>Jailbreak</h1>
       <p>Enter pwned DFU with checkm8, then run an exploit chain.</p>
     </div>
   </div>
@@ -193,13 +181,6 @@
 
   .view-header {
     margin-bottom: var(--spacing-lg);
-  }
-
-  .view-header h1 {
-    color: var(--color-text-primary);
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 var(--spacing-xs);
   }
 
   .view-header p {

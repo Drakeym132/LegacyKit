@@ -49,7 +49,7 @@
 </script>
 
 <aside
-  class="w-[268px] h-full bg-[var(--color-bg-sidebar)] border-r border-[var(--color-border)] flex flex-col shrink-0 backdrop-blur-2xl"
+  class="w-[268px] h-[calc(100%-0.5rem)] mt-2 bg-[var(--color-bg-sidebar)] rounded-[20px] border border-[var(--color-border)] shadow-lg flex flex-col shrink-0 backdrop-blur-2xl"
 >
   <!-- Drag region behind stoplights -->
   <div class="h-10 shrink-0" data-tauri-drag-region></div>

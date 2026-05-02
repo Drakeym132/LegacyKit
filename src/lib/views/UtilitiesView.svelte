@@ -29,6 +29,7 @@
   import { settingsStore } from '$lib/stores/settingsStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
   import { createWorkingController } from '$lib/utils/workingState.svelte';
+  import PwnDfuHelper from '$lib/components/device/PwnDfuHelper.svelte';
 
   type TabId = 'actions' | 'irecovery' | 'syslog' | 'export' | 'trollstore';
   let activeTab = $state<TabId>('actions');
@@ -205,7 +206,6 @@
 <div class="view">
   <div class="view-header">
     <div>
-      <h1>Utilities</h1>
       <p>
         Recovery, activation, diagnostics export, NVRAM, and live syslog. These wrap
         <code>idevice*</code> and <code>irecovery</code> binaries.
@@ -291,7 +291,16 @@
     </section>
 
     <section class="panel">
-      <div class="section-title"><span>2</span><h2>Pairing</h2></div>
+      <div class="section-title"><span>2</span><h2>Enter pwnDFU</h2></div>
+      <p class="panel-note">
+        Picks the right exploit for the connected device (gaster / ipwnder / primepwn) and
+        verifies the pwn via <code>irecovery -q</code>. Required before Just Boot or SSH Ramdisk.
+      </p>
+      <PwnDfuHelper />
+    </section>
+
+    <section class="panel">
+      <div class="section-title"><span>3</span><h2>Pairing</h2></div>
       <div class="action-grid">
         <button onclick={() => handlePair('pair')} disabled={work.isWorking}>
           Pair (Trust)
@@ -306,7 +315,7 @@
     </section>
 
     <section class="panel">
-      <div class="section-title"><span>3</span><h2>Activation</h2></div>
+      <div class="section-title"><span>4</span><h2>Activation</h2></div>
       <p class="panel-note">
         For iPhone 4 / older devices a valid SIM card is usually required to activate.
         For hacktivation (iOS ≤ 6) use <em>Restore/Downgrade</em> with the Hacktivate flag,
@@ -528,12 +537,6 @@
 
 <style>
   .view-header { margin-bottom: var(--spacing-lg); }
-  .view-header h1 {
-    color: var(--color-text-primary);
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 var(--spacing-xs);
-  }
   .view-header p {
     color: var(--color-text-secondary);
     font-size: 0.9rem;

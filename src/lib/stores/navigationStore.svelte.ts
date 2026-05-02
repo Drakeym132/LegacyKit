@@ -1,5 +1,5 @@
 // Navigation views that match the sidebar items
-export type ViewName = 
+export type ViewName =
   | 'home'
   | 'restore'
   | 'jailbreak'
@@ -9,6 +9,18 @@ export type ViewName =
   | 'data'
   | 'utilities'
   | 'settings';
+
+export const viewTitles: Record<ViewName, string> = {
+  home: 'Home',
+  restore: 'Restore & Downgrade',
+  jailbreak: 'Jailbreak',
+  shsh: 'SHSH Blobs',
+  'ssh-ramdisk': 'SSH Ramdisk',
+  apps: 'App Management',
+  data: 'Data Management',
+  utilities: 'Utilities',
+  settings: 'Settings',
+};
 
 class NavigationStore {
   currentView = $state<ViewName>('home');

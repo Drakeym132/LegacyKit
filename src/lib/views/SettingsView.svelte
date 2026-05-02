@@ -89,10 +89,6 @@
 </script>
 
 <div class="view view--narrow">
-  <div class="view-header">
-    <h1>Settings</h1>
-  </div>
-
   <div class="settings-group">
     <h3>Appearance</h3>
     <div class="setting-row">
@@ -180,6 +176,21 @@
         onchange={handlePollIntervalChange}
       />
     </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <label for="auto-pwndfu-toggle">Auto-enter pwnDFU in Just Boot</label>
+        <span class="setting-hint">When the Just Boot modal opens with the device already in DFU, run the pwn exploit immediately.</span>
+      </div>
+      <label class="toggle">
+        <input
+          id="auto-pwndfu-toggle"
+          type="checkbox"
+          checked={settingsStore.autoEnterPwnDfu}
+          onchange={() => (settingsStore.autoEnterPwnDfu = !settingsStore.autoEnterPwnDfu)}
+        />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
   </div>
 
   <div class="settings-group">
@@ -245,9 +256,6 @@
 </div>
 
 <style>
-  .view-header { margin-bottom: var(--spacing-lg); }
-  .view-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--color-text-primary); margin: 0; }
-
   .settings-group {
     margin-bottom: var(--spacing-lg);
   }

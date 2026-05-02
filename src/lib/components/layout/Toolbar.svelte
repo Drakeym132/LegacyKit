@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { onMount } from 'svelte';
+  import { navigationStore, viewTitles } from '$lib/stores/navigationStore.svelte';
 
   let isMacOS = $state(false);
   let isMaximized = $state(false);
@@ -29,13 +30,9 @@
 <header class="titlebar" class:macos={isMacOS}>
   <div class="title-row" data-tauri-drag-region>
     <div class="title-left" data-tauri-drag-region>
-      {#if isMacOS}
-        <div class="traffic-light-spacer" data-tauri-drag-region></div>
-      {/if}
-    </div>
-
-    <div class="title-center" data-tauri-drag-region>
-      <span class="title-text" data-tauri-drag-region>LegacyKit</span>
+      <h1 class="title-text" data-tauri-drag-region>
+        {viewTitles[navigationStore.currentView]}
+      </h1>
     </div>
 
     <div class="title-right">
@@ -79,37 +76,31 @@
   }
 
   .title-row {
-    height: 28px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
+    padding-left: 24px;
   }
 
   .title-left {
     display: flex;
     align-items: center;
-    min-width: 70px;
-    height: 100%;
-  }
-
-  .traffic-light-spacer {
-    width: 70px;
-    height: 100%;
-  }
-
-  .title-center {
     flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    min-width: 0;
+    height: 100%;
   }
 
   .title-text {
-    font-size: 12px;
-    font-weight: 600;
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
     color: var(--color-text-primary);
-    opacity: 0.7;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .title-right {
@@ -126,7 +117,7 @@
     align-items: center;
     justify-content: center;
     width: 46px;
-    height: 28px;
+    height: 48px;
     border: none;
     background: transparent;
     color: var(--color-text-primary);
@@ -145,9 +136,5 @@
     background-color: var(--color-danger);
     color: white;
     opacity: 1;
-  }
-
-  .titlebar.macos .title-right {
-    min-width: 70px;
   }
 </style>

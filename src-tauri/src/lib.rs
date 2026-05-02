@@ -5,11 +5,89 @@ pub mod models;
 pub mod commands;
 pub mod services;
 
+#[cfg(target_os = "macos")]
+const WINDOW_CORNER_RADIUS: f64 = 28.0;
+
+#[cfg(target_os = "macos")]
+fn apply_window_corner_radius(window: &tauri::WebviewWindow) {
+    use objc::runtime::{Object, NO, YES};
+    use objc::{class, msg_send, sel, sel_impl};
+
+    let Ok(ns_window) = window.ns_window() else { return };
+    let ns_window = ns_window as *mut Object;
+    if ns_window.is_null() { return; }
+
+    unsafe fn round_layer(view: *mut Object, radius: f64) {
+        if view.is_null() { return; }
+        let _: () = msg_send![view, setWantsLayer: YES];
+        let layer: *mut Object = msg_send![view, layer];
+        if layer.is_null() { return; }
+        let _: () = msg_send![layer, setCornerRadius: radius];
+        let _: () = msg_send![layer, setMasksToBounds: YES];
+    }
+
+    // Drop the 1px AppKit stroke and chrome tint that AppKit traces along the
+    // rounded path on the NSThemeFrame layer; without this a thin rim is
+    // visible just outside the rounded corners.
+    unsafe fn neutralize_layer_chrome(view: *mut Object) {
+        if view.is_null() { return; }
+        let layer: *mut Object = msg_send![view, layer];
+        if layer.is_null() { return; }
+
+        let _: () = msg_send![layer, setBorderWidth: 0.0_f64];
+        let nil_color: *mut Object = std::ptr::null_mut();
+        let _: () = msg_send![layer, setBorderColor: nil_color];
+
+        let ns_color_cls = class!(NSColor);
+        let clear_ns: *mut Object = msg_send![ns_color_cls, clearColor];
+        let clear_cg: *mut Object = msg_send![clear_ns, CGColor];
+        let _: () = msg_send![layer, setBackgroundColor: clear_cg];
+    }
+
+    unsafe {
+        let content_view: *mut Object = msg_send![ns_window, contentView];
+        if content_view.is_null() { return; }
+        round_layer(content_view, WINDOW_CORNER_RADIUS);
+
+        // The contentView's superview is the NSWindow's frame view (NSThemeFrame).
+        // Without rounding it too, its square corners bleed above the rounded
+        // contentView and the system shadow traces the square frame.
+        let frame_view: *mut Object = msg_send![content_view, superview];
+        round_layer(frame_view, WINDOW_CORNER_RADIUS);
+
+        neutralize_layer_chrome(content_view);
+        neutralize_layer_chrome(frame_view);
+
+        // Re-assert window-level transparency in case AppKit re-derived a
+        // non-clear backing color after we touched the frame_view's layer.
+        let _: () = msg_send![ns_window, setOpaque: NO];
+        let ns_color_cls = class!(NSColor);
+        let clear_color: *mut Object = msg_send![ns_color_cls, clearColor];
+        let _: () = msg_send![ns_window, setBackgroundColor: clear_color];
+
+        // Force the system shadow to recompute from the new rounded shape.
+        let _: () = msg_send![ns_window, setHasShadow: YES];
+        let _: () = msg_send![ns_window, invalidateShadow];
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    apply_window_corner_radius(&window);
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            { let _ = app; }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::device::detect_device,
             commands::restore::get_restore_options,
@@ -25,6 +103,8 @@ pub fn run() {
             commands::jailbreak::run_kloader,
             commands::jailbreak::run_g1lbertjb,
             commands::jailbreak::run_evasi0n,
+            commands::jailbreak::enter_pwndfu,
+            commands::jailbreak::download_pwn_tool,
             commands::just_boot::list_just_boot_history,
             commands::just_boot::record_just_boot,
             commands::just_boot::forget_just_boot,

@@ -237,7 +237,6 @@
 <div class="view">
   <div class="view-header">
     <div>
-      <h1>Restore & Downgrade</h1>
       <p>Choose a path, prepare the IPSW, then preview the restore command.</p>
     </div>
   </div>
@@ -449,13 +448,6 @@
 <style>
   .view-header {
     margin-bottom: var(--spacing-lg);
-  }
-
-  .view-header h1 {
-    color: var(--color-text-primary);
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 var(--spacing-xs);
   }
 
   .view-header p {

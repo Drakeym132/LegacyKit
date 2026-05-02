@@ -19,7 +19,7 @@
 
   $effect(() => {
     const autoDetectDevice = settingsStore.autoDetectDevice;
-    const pollIntervalMs = settingsStore.pollIntervalMs;
+    const pollIntervalMs = settingsStore.pollBoostMs ?? settingsStore.pollIntervalMs;
 
     if (pollInterval) {
       clearInterval(pollInterval);
@@ -86,9 +86,9 @@
   }
 </script>
 
-<div class="flex h-screen w-screen overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
+<div class="flex h-screen w-screen overflow-hidden rounded-[28px] bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] gap-2 p-2 pt-0">
   <Sidebar />
-  <div class="flex flex-col flex-1 overflow-hidden">
+  <div class="flex flex-col flex-1 overflow-hidden rounded-[20px] bg-[var(--color-bg-elevated)] border border-[var(--color-border)] mt-2">
     <Toolbar />
     <ContentArea />
   </div>

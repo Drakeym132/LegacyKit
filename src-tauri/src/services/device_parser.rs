@@ -74,9 +74,17 @@ pub fn parse_irecovery_q(stdout: &str) -> DeviceInfo {
                 "IBFL" => info.ibfl = Some(value),
                 "NONC" => info.apnonce = Some(value),
                 "SNON" => info.sepnonce = Some(value),
+                "PWND" => info.pwnd = Some(value),
+                "SRTG" => info.srtg = Some(value),
                 _ => {}
             }
         }
+    }
+
+    // PWND is only emitted by irecovery once a checkm8-style exploit has run,
+    // so its presence promotes "DFU" to "pwnDFU".
+    if matches!(info.mode, DeviceMode::DFU) && info.pwnd.as_deref().is_some_and(|s| !s.is_empty()) {
+        info.mode = DeviceMode::PwnDFU;
     }
 
     info
@@ -147,5 +155,29 @@ PRODUCT: iPhone6,1
 
         let unknown = parse_irecovery_q("MODE: WTF\n");
         assert!(matches!(unknown.mode, DeviceMode::Recovery));
+    }
+
+    #[test]
+    fn parse_irecovery_q_pwndfu_path() {
+        let out = r#"ECID: 0x1234ABCD
+CPID: 0x8960
+BDID: 0x0A
+MODE: DFU
+PRODUCT: iPhone6,1
+PWND: gaster
+SRTG: [iBoot-1940.10]
+"#;
+
+        let info = parse_irecovery_q(out);
+        assert!(matches!(info.mode, DeviceMode::PwnDFU));
+        assert_eq!(info.pwnd.as_deref(), Some("gaster"));
+        assert_eq!(info.srtg.as_deref(), Some("[iBoot-1940.10]"));
+    }
+
+    #[test]
+    fn parse_irecovery_q_dfu_with_empty_pwnd_stays_dfu() {
+        let out = "MODE: DFU\nPWND:\n";
+        let info = parse_irecovery_q(out);
+        assert!(matches!(info.mode, DeviceMode::DFU));
     }
 }

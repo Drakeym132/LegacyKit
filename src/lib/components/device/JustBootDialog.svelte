@@ -11,6 +11,10 @@
   import { deviceStore } from '../../stores/deviceStore.svelte';
   import { logStore } from '../../stores/logStore.svelte';
   import { toastStore } from '../../stores/toastStore.svelte';
+  import { settingsStore } from '../../stores/settingsStore.svelte';
+  import { inferProcessorGen } from '../../utils/processorGen';
+  import { enterPwndfu } from '../../api/jailbreak';
+  import PwnDfuHelper from './PwnDfuHelper.svelte';
   import { open as openDialog } from '@tauri-apps/plugin-dialog';
 
   interface Props {
@@ -35,9 +39,14 @@
 
   // Device state
   let deviceState = $derived(deviceStore.state);
-  let isPwnDfu = $derived(deviceState.mode === 'pwnDFU');
   let deviceEcid = $derived(deviceState.ecid);
   let deviceProductType = $derived(deviceState.product_type);
+  let procGen = $derived(inferProcessorGen(deviceProductType));
+  // A6 devices can boot via kDFU as well (matches restore.sh's pwnDFU/kDFU options),
+  // so accept either pwnDFU or A6+kDFU as a valid boot state.
+  let isBootableMode = $derived(
+    deviceState.mode === 'pwnDFU' || (procGen === 6 && deviceState.mode === 'kDFU')
+  );
 
   // History filtering
   let heroEntry = $derived<JustBootEntry | null>(
@@ -71,20 +80,6 @@
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 30) return `${diffDays}d ago`;
     return date.toLocaleDateString();
-  }
-
-  function inferProcessorGen(product: string | null): number | null {
-    if (!product) return null;
-    if (/^iPhone(1|2),/.test(product) || /^iPod(1|2),/.test(product)) return 1;
-    if (product === 'iPod3,1') return 3;
-    if (/^iPhone3,/.test(product) || product === 'iPad1,1' || product === 'iPod4,1') return 4;
-    if (product === 'iPhone4,1' || /^iPad2,/.test(product) || /^iPad3,[1-3]/.test(product) || product === 'iPod5,1') return 5;
-    if (/^iPhone5,/.test(product) || /^iPad3,[4-6]/.test(product)) return 6;
-    if (/^iPhone6,/.test(product) || /^iPad4,/.test(product)) return 7;
-    if (/^iPhone7,/.test(product) || product === 'iPod7,1' || /^iPad5,/.test(product)) return 8;
-    if (/^iPhone8,/.test(product) || /^iPad6,/.test(product)) return 9;
-    if (/^iPhone9,/.test(product) || /^iPad7,/.test(product)) return 10;
-    return null;
   }
 
   function updateIncludeIbecDefault() {
@@ -124,7 +119,7 @@
 
   async function handleHeroBoot() {
     if (!heroEntry || !heroEntry.repackedIbssPath) return;
-    if (!isPwnDfu) {
+    if (!isBootableMode) {
       errorMessage = 'Device must be in pwnDFU mode before booting';
       return;
     }
@@ -168,7 +163,7 @@
 
   async function handleHistoryBoot(entry: JustBootEntry) {
     if (!entry.repackedIbssPath) return;
-    if (!isPwnDfu) {
+    if (!isBootableMode) {
       errorMessage = 'Device must be in pwnDFU mode before booting';
       return;
     }
@@ -215,7 +210,7 @@
       errorMessage = 'IPSW path and Build ID are required.';
       return;
     }
-    if (!isPwnDfu) {
+    if (!isBootableMode) {
       errorMessage = 'Device must be in pwnDFU mode before booting';
       return;
     }
@@ -278,6 +273,31 @@
     if (isOpen) {
       loadHistory();
       updateIncludeIbecDefault();
+      void maybeAutoEnterPwndfu();
+    }
+  });
+
+  let autoPwnAttempted = false;
+  async function maybeAutoEnterPwndfu() {
+    if (!settingsStore.autoEnterPwnDfu || autoPwnAttempted) return;
+    if (!deviceState.connected || deviceState.mode !== 'DFU') return;
+    if (!deviceProductType) return;
+    autoPwnAttempted = true;
+    isWorking = true;
+    try {
+      const result = await enterPwndfu({ productType: deviceProductType });
+      deviceStore.optimisticallySetMode(result.mode, result.pwnd);
+      toastStore.success('pwnDFU entered', `via ${result.tool}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errorMessage = msg;
+    } finally {
+      isWorking = false;
+    }
+  }
+  $effect(() => {
+    if (!isOpen) {
+      autoPwnAttempted = false;
     }
   });
 
@@ -314,11 +334,9 @@
         </div>
       {/if}
 
-      <!-- pwnDFU Warning -->
-      {#if deviceState.connected && !isPwnDfu}
-        <div class="warning-banner">
-          ⚠️ Device must be in pwnDFU mode before booting
-        </div>
+      <!-- pwnDFU helper / warning -->
+      {#if !isBootableMode}
+        <PwnDfuHelper />
       {/if}
 
       <!-- Hero Card - Boot last build -->
@@ -336,7 +354,7 @@
               <button 
                 class="primary large" 
                 onclick={handleHeroBoot}
-                disabled={isWorking || !isPwnDfu}
+                disabled={isWorking || !isBootableMode}
               >
                 {isWorking ? 'Booting…' : 'Boot'}
               </button>
@@ -377,7 +395,7 @@
                       <button 
                         class="primary small"
                         onclick={() => handleHistoryBoot(entry)}
-                        disabled={isWorking || !isPwnDfu}
+                        disabled={isWorking || !isBootableMode}
                       >
                         Boot
                       </button>
@@ -426,8 +444,8 @@
                       <button 
                         class="primary small"
                         onclick={() => handleHistoryBoot(entry)}
-                        disabled={isWorking || !isPwnDfu}
-                        title={!isPwnDfu ? 'Connect this device to boot' : ''}
+                        disabled={isWorking || !isBootableMode}
+                        title={!isBootableMode ? 'Connect this device to boot' : ''}
                       >
                         Boot
                       </button>
@@ -509,7 +527,7 @@
             <button 
               class="primary"
               onclick={handlePrepareAndBoot}
-              disabled={isWorking || !isPwnDfu || !ipswPath.trim() || !buildId.trim()}
+              disabled={isWorking || !isBootableMode || !ipswPath.trim() || !buildId.trim()}
             >
               {isWorking ? 'Working…' : 'Prepare & Boot'}
             </button>
@@ -593,16 +611,6 @@
     font-size: 0.75rem;
     color: var(--color-text-tertiary);
     font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
-  }
-
-  .warning-banner {
-    background: color-mix(in srgb, var(--color-warning) 15%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-warning) 40%, transparent);
-    color: var(--color-warning-text);
-    padding: 8px 12px;
-    border-radius: var(--radius-sm);
-    font-size: 0.8125rem;
-    font-weight: 500;
   }
 
   .hero-card {

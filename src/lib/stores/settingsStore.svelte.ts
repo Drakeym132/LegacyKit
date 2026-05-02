@@ -13,6 +13,7 @@ class SettingsStore {
   terminalHeight = $state<number>(200);
   autoDetectDevice = $state<boolean>(true);
   pollIntervalMs = $state<number>(3000);
+  autoEnterPwnDfu = $state<boolean>(false);
   workspaceRoot = $state<string | null>(null);
   onboarded = $state<boolean>(false);
   loaded = $state<boolean>(false);
@@ -33,6 +34,19 @@ class SettingsStore {
 
   setPollInterval(ms: number) {
     this.pollIntervalMs = Math.max(1000, ms);
+  }
+
+  // Live override the device poller for a short window (e.g. while a pwn is mid-flight,
+  // so the mode flip is observed quickly even without the optimistic update).
+  pollBoostMs = $state<number | null>(null);
+  private boostTimer: ReturnType<typeof setTimeout> | null = null;
+  boostPolling(ms = 500, durationMs = 8000) {
+    this.pollBoostMs = ms;
+    if (this.boostTimer) clearTimeout(this.boostTimer);
+    this.boostTimer = setTimeout(() => {
+      this.pollBoostMs = null;
+      this.boostTimer = null;
+    }, durationMs);
   }
 
   async load() {

@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { DeviceMode } from '$lib/stores/deviceStore.svelte';
 
 export type GasterAction = 'pwn' | 'reset';
 
@@ -45,4 +46,32 @@ export function runG1lbertJB(request: UntetherRequest): Promise<UntetherResult> 
 
 export function runEvasi0n(request: UntetherRequest): Promise<UntetherResult> {
   return invoke<UntetherResult>('run_evasi0n', { request });
+}
+
+export interface EnterPwnDfuRequest {
+  productType: string;
+}
+
+export interface EnterPwnDfuResult {
+  tool: string;
+  args: string[];
+  pwnd: string | null;
+  mode: DeviceMode;
+}
+
+export function enterPwndfu(request: EnterPwnDfuRequest): Promise<EnterPwnDfuResult> {
+  return invoke<EnterPwnDfuResult>('enter_pwndfu', { request });
+}
+
+export interface DownloadPwnToolRequest {
+  tool: 'kuroutadori';
+}
+
+export interface DownloadPwnToolResult {
+  tool: string;
+  binaryPath: string;
+}
+
+export function downloadPwnTool(request: DownloadPwnToolRequest): Promise<DownloadPwnToolResult> {
+  return invoke<DownloadPwnToolResult>('download_pwn_tool', { request });
 }

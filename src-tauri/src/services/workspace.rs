@@ -68,6 +68,10 @@ impl WorkspaceLayout {
         self.root.join("tmp")
     }
 
+    pub fn tools_dir(&self) -> PathBuf {
+        self.root.join("tools")
+    }
+
     pub fn ensure_layout(&self) -> Result<(), AppError> {
         fs::create_dir_all(&self.root)?;
         fs::create_dir_all(self.root.join("ipsw"))?;
@@ -78,6 +82,7 @@ impl WorkspaceLayout {
         fs::create_dir_all(self.root.join("backups"))?;
         fs::create_dir_all(self.logs_dir())?;
         fs::create_dir_all(self.tmp_dir())?;
+        fs::create_dir_all(self.tools_dir())?;
         Ok(())
     }
 
