@@ -116,6 +116,38 @@ fn apply_window_corner_radius(window: &tauri::WebviewWindow) {
     }
 }
 
+// Toggle a real macOS NSVisualEffectView (Sidebar material, BlendingMode =
+// BehindWindow) behind the webview, so the chrome blurs the desktop instead
+// of just lowering panel alpha. Implemented via the window-vibrancy crate to
+// avoid hand-rolling NSRect / NSWindowOrderingMode FFI calls. Idempotent —
+// re-applying the same material is a no-op; clearing when nothing is applied
+// returns Err which we ignore.
+#[cfg(target_os = "macos")]
+pub(crate) fn set_vibrancy_visible(window: &tauri::WebviewWindow, visible: bool) {
+    use window_vibrancy::{apply_vibrancy, clear_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+
+    if visible {
+        let _ = apply_vibrancy(
+            window,
+            NSVisualEffectMaterial::Sidebar,
+            Some(NSVisualEffectState::FollowsWindowActiveState),
+            Some(WINDOW_CORNER_RADIUS),
+        );
+    } else {
+        let _ = clear_vibrancy(window);
+    }
+
+    // Re-recompute the system shadow against the new backing material.
+    use objc::runtime::Object;
+    use objc::{msg_send, sel, sel_impl};
+    if let Ok(ns_window) = window.ns_window() {
+        let ns_window = ns_window as *mut Object;
+        if !ns_window.is_null() {
+            unsafe { let _: () = msg_send![ns_window, invalidateShadow]; }
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -190,6 +222,7 @@ pub fn run() {
             commands::settings::ensure_workspace_layout,
             commands::settings::reveal_workspace,
             commands::settings::set_window_shadow,
+            commands::settings::set_glass_chrome,
             commands::trollstore::prepare_trollstore_assets,
             commands::trollstore::check_trollstore_eligibility,
             commands::updates::check_for_updates,

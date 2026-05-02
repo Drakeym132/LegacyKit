@@ -12,7 +12,7 @@
   import type { LogEventPayload } from './lib/stores/logStore.svelte';
   import { logStore } from './lib/stores/logStore.svelte';
   import { settingsStore } from './lib/stores/settingsStore.svelte';
-  import { setWindowShadow } from './lib/api/settings';
+  import { setGlassChrome, setWindowShadow } from './lib/api/settings';
   
   import './app.css';
 
@@ -69,10 +69,20 @@
       delete root.dataset.glassChrome;
     }
 
+    void setGlassChrome(glassChrome).catch(() => {
+      // Non-fatal: native vibrancy is macOS-only; CSS fallback still applies.
+    });
+
     void setWindowShadow(true).catch(() => {
       // Non-fatal: shadow toggling is a cosmetic enhancement on supported
       // platforms and should never block rendering.
     });
+  });
+
+  $effect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--sidebar-opacity', String(settingsStore.sidebarOpacity));
+    root.style.setProperty('--content-opacity', String(settingsStore.contentOpacity));
   });
 
   onMount(() => {

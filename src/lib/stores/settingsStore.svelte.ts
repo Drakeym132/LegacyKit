@@ -10,6 +10,20 @@ import {
 const REDUCE_MOTION_KEY = 'legacykit.reduceMotion';
 const GLASS_CHROME_KEY = 'legacykit.glassChrome';
 const LEGACY_FLAT_CHROME_KEY = 'legacykit.flatChrome';
+const SIDEBAR_OPACITY_KEY = 'legacykit.sidebarOpacity';
+const CONTENT_OPACITY_KEY = 'legacykit.contentOpacity';
+
+const DEFAULT_SIDEBAR_OPACITY = 0.42;
+const DEFAULT_CONTENT_OPACITY = 0.38;
+
+function loadOpacity(key: string, fallback: number): number {
+  if (typeof window === 'undefined') return fallback;
+  const stored = window.localStorage.getItem(key);
+  if (stored === null) return fallback;
+  const parsed = Number(stored);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(1, Math.max(0, parsed));
+}
 
 function loadReduceMotion(): boolean {
   if (typeof window === 'undefined') return false;
@@ -42,6 +56,8 @@ class SettingsStore {
   autoEnterPwnDfu = $state<boolean>(false);
   reduceMotion = $state<boolean>(loadReduceMotion());
   glassChrome = $state<boolean>(loadGlassChrome());
+  sidebarOpacity = $state<number>(loadOpacity(SIDEBAR_OPACITY_KEY, DEFAULT_SIDEBAR_OPACITY));
+  contentOpacity = $state<number>(loadOpacity(CONTENT_OPACITY_KEY, DEFAULT_CONTENT_OPACITY));
   workspaceRoot = $state<string | null>(null);
   onboarded = $state<boolean>(false);
   loaded = $state<boolean>(false);
@@ -63,6 +79,22 @@ class SettingsStore {
     this.glassChrome = value;
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(GLASS_CHROME_KEY, value ? 'true' : 'false');
+    }
+  }
+
+  setSidebarOpacity(value: number) {
+    const clamped = Math.min(1, Math.max(0, value));
+    this.sidebarOpacity = clamped;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SIDEBAR_OPACITY_KEY, String(clamped));
+    }
+  }
+
+  setContentOpacity(value: number) {
+    const clamped = Math.min(1, Math.max(0, value));
+    this.contentOpacity = clamped;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(CONTENT_OPACITY_KEY, String(clamped));
     }
   }
 

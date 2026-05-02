@@ -94,6 +94,16 @@
   function handleGlassChromeToggle() {
     settingsStore.setGlassChrome(!settingsStore.glassChrome);
   }
+
+  function handleSidebarOpacityChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    settingsStore.setSidebarOpacity(Number(target.value) / 100);
+  }
+
+  function handleContentOpacityChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    settingsStore.setContentOpacity(Number(target.value) / 100);
+  }
 </script>
 
 <div class="view view--narrow">
@@ -128,6 +138,44 @@
         />
         <span class="toggle-slider"></span>
       </label>
+    </div>
+    <div class="setting-row" class:disabled={!settingsStore.glassChrome}>
+      <div class="setting-info">
+        <label for="sidebar-opacity">Sidebar opacity</label>
+        <span class="setting-hint">How opaque the sidebar surface is over the glass chrome</span>
+      </div>
+      <div class="range-control">
+        <input
+          id="sidebar-opacity"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          disabled={!settingsStore.glassChrome}
+          value={Math.round(settingsStore.sidebarOpacity * 100)}
+          oninput={handleSidebarOpacityChange}
+        />
+        <span>{Math.round(settingsStore.sidebarOpacity * 100)}%</span>
+      </div>
+    </div>
+    <div class="setting-row" class:disabled={!settingsStore.glassChrome}>
+      <div class="setting-info">
+        <label for="content-opacity">Content opacity</label>
+        <span class="setting-hint">How opaque the main content surface is over the glass chrome</span>
+      </div>
+      <div class="range-control">
+        <input
+          id="content-opacity"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          disabled={!settingsStore.glassChrome}
+          value={Math.round(settingsStore.contentOpacity * 100)}
+          oninput={handleContentOpacityChange}
+        />
+        <span>{Math.round(settingsStore.contentOpacity * 100)}%</span>
+      </div>
     </div>
   </div>
 
@@ -322,6 +370,7 @@
   .setting-row:first-of-type { border-radius: var(--radius-md) var(--radius-md) 0 0; }
   .setting-row:last-of-type { border-radius: 0 0 var(--radius-md) var(--radius-md); margin-bottom: 0; }
   .setting-row:only-of-type { border-radius: var(--radius-md); }
+  .setting-row.disabled { opacity: 0.5; }
 
   .setting-info {
     display: flex;

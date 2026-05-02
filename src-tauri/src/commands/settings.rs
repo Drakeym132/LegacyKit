@@ -77,6 +77,27 @@ pub async fn pick_workspace_root(_app: AppHandle) -> Result<Option<String>, AppE
 }
 
 #[tauri::command]
+pub async fn set_glass_chrome(app: AppHandle, enabled: bool) -> Result<(), AppError> {
+    #[cfg(target_os = "macos")]
+    {
+        let app_handle = app.clone();
+        app.run_on_main_thread(move || {
+            if let Some(window) = app_handle.get_webview_window("main") {
+                crate::set_vibrancy_visible(&window, enabled);
+            }
+        })
+        .map_err(|err| AppError::CommandFailed(format!("Failed to toggle glass chrome on main thread: {err}")))?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, enabled);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn set_window_shadow(app: AppHandle, enabled: bool) -> Result<(), AppError> {
     #[cfg(target_os = "macos")]
     {

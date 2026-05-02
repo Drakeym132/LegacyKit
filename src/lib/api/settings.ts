@@ -41,3 +41,7 @@ export function revealWorkspace(): Promise<void> {
 export function setWindowShadow(enabled: boolean): Promise<void> {
   return invoke<void>('set_window_shadow', { enabled });
 }
+
+export function setGlassChrome(enabled: boolean): Promise<void> {
+  return invoke<void>('set_glass_chrome', { enabled });
+}
