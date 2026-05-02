@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 export interface AppSettings {
   workspaceRoot: string | null;
   onboarded: boolean;
+  glassChrome?: boolean;
 }
 
 export interface WorkspacePaths {

@@ -100,7 +100,7 @@
 </script>
 
 <aside
-  class="w-[268px] h-[calc(100%-var(--shell-inset-top))] mt-[var(--shell-inset-top)] bg-[var(--color-bg-sidebar)] rounded-[20px] border border-[var(--color-border)] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.18),0_2px_6px_-2px_rgba(0,0,0,0.10)] flex flex-col shrink-0 backdrop-blur-2xl"
+  class="w-[268px] h-[calc(100%-var(--shell-inset-top))] mt-[var(--shell-inset-top)] bg-[var(--color-bg-sidebar)] rounded-[20px] border border-[var(--color-border)] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.18),0_2px_6px_-2px_rgba(0,0,0,0.10)] flex flex-col shrink-0 backdrop-blur-2xl backdrop-saturate-150"
 >
   <!-- Drag region behind stoplights -->
   <div class="h-10 shrink-0" data-tauri-drag-region></div>

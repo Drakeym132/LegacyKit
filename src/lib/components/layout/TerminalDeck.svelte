@@ -30,7 +30,7 @@
 </script>
 
 <div
-  class="terminal-deck shrink-0 flex flex-col bg-[var(--color-bg-secondary)] border-t border-[var(--color-border)] overflow-hidden"
+  class="terminal-deck shrink-0 flex flex-col bg-[var(--color-bg-secondary)] border-t border-[var(--color-border)] overflow-hidden backdrop-blur-xl backdrop-saturate-150"
   class:is-open={isOpen}
 >
   <!-- Header (always visible, click anywhere to toggle) -->
@@ -128,10 +128,12 @@
 <style>
   .terminal-deck {
     box-shadow: 0 -10px 10px rgba(0, 0, 0, 0.06), 0 -1px 0 rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
   }
   .terminal-header {
     color: var(--color-text-secondary);
-    background: var(--color-bg-secondary);
+    background: color-mix(in srgb, var(--color-bg-secondary) 85%, rgba(255,255,255,0.06));
   }
   .terminal-header:hover {
     background: color-mix(
@@ -142,7 +144,7 @@
   }
   .terminal-header.header-open {
     color: #98989d;
-    background: #2c2c2e;
+    background: color-mix(in srgb, var(--color-bg-secondary) 90%, rgba(0,0,0,0.12));
     border-bottom: 1px solid #38383a;
   }
   .terminal-header.header-open:hover {
@@ -152,7 +154,7 @@
   /* Animated open/close: height transition on body */
   .terminal-body {
     overflow: hidden;
-    background: #1c1c1e;
+    background: color-mix(in srgb, var(--color-bg-secondary) 88%, rgba(0,0,0,0.12));
     /* Apple-style ease for natural motion in both directions */
     transition: height 240ms cubic-bezier(0.32, 0.72, 0, 1);
     will-change: height;
@@ -181,4 +183,3 @@
     }
   }
 </style>
-

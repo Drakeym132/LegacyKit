@@ -62,14 +62,14 @@
 
   $effect(() => {
     const root = document.documentElement;
-    const flatChrome = settingsStore.flatChrome;
-    if (flatChrome) {
-      root.dataset.flatChrome = 'true';
+    const glassChrome = settingsStore.glassChrome;
+    if (glassChrome) {
+      root.dataset.glassChrome = 'true';
     } else {
-      delete root.dataset.flatChrome;
+      delete root.dataset.glassChrome;
     }
 
-    void setWindowShadow(!flatChrome).catch(() => {
+    void setWindowShadow(true).catch(() => {
       // Non-fatal: shadow toggling is a cosmetic enhancement on supported
       // platforms and should never block rendering.
     });
@@ -122,7 +122,7 @@
     width: 100vw;
     overflow: hidden;
     color: var(--color-text-primary);
-    background-color: var(--shell-bg);
+    background: var(--shell-bg);
     border-radius: var(--shell-radius);
     gap: var(--shell-gap);
     padding: 0 var(--shell-inset) var(--shell-inset);
@@ -138,5 +138,7 @@
     border-radius: var(--content-radius);
     margin-top: var(--shell-inset-top);
     box-shadow: var(--content-shadow);
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
   }
 </style>

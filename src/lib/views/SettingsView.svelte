@@ -91,8 +91,8 @@
     settingsStore.setReduceMotion(!settingsStore.reduceMotion);
   }
 
-  function handleFlatChromeToggle() {
-    settingsStore.setFlatChrome(!settingsStore.flatChrome);
+  function handleGlassChromeToggle() {
+    settingsStore.setGlassChrome(!settingsStore.glassChrome);
   }
 </script>
 
@@ -116,15 +116,15 @@
     </div>
     <div class="setting-row">
       <div class="setting-info">
-        <label for="flat-chrome-toggle">Floating tiles</label>
-        <span class="setting-hint">Hide the background layer behind the sidebar and content so they float over the window</span>
+        <label for="glass-chrome-toggle">Glass effect</label>
+        <span class="setting-hint">Keep the background chrome but add blur/translucency to sidebar and content</span>
       </div>
       <label class="toggle">
         <input
-          id="flat-chrome-toggle"
+          id="glass-chrome-toggle"
           type="checkbox"
-          checked={settingsStore.flatChrome}
-          onchange={handleFlatChromeToggle}
+          checked={settingsStore.glassChrome}
+          onchange={handleGlassChromeToggle}
         />
         <span class="toggle-slider"></span>
       </label>

@@ -110,22 +110,25 @@
   .titlebar {
     display: flex;
     flex-direction: column;
-    background: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 85%, rgba(255,255,255,0.08));
     flex-shrink: 0;
     position: relative;
     z-index: 100;
-   box-shadow: 0 10px 10px rgba(0, 0, 0, 0.06), 0 -1px 0 rgba(0, 0, 0, 0.04);
+    box-shadow: 0 10px 10px rgba(0, 0, 0, 0.06), 0 -1px 0 rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
     user-select: none;
     -webkit-user-select: none;
   }
 
   .title-row {
-    height: 32px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
     padding-left: 16px;
+    padding-right: 10px;
   }
 
   .title-left {

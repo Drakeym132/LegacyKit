@@ -8,7 +8,8 @@ import {
 } from '$lib/api/settings';
 
 const REDUCE_MOTION_KEY = 'legacykit.reduceMotion';
-const FLAT_CHROME_KEY = 'legacykit.flatChrome';
+const GLASS_CHROME_KEY = 'legacykit.glassChrome';
+const LEGACY_FLAT_CHROME_KEY = 'legacykit.flatChrome';
 
 function loadReduceMotion(): boolean {
   if (typeof window === 'undefined') return false;
@@ -21,9 +22,15 @@ function loadReduceMotion(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 }
 
-function loadFlatChrome(): boolean {
+function loadGlassChrome(): boolean {
   if (typeof window === 'undefined') return false;
-  return window.localStorage.getItem(FLAT_CHROME_KEY) === 'true';
+
+  const stored = window.localStorage.getItem(GLASS_CHROME_KEY);
+  if (stored === 'true') return true;
+  if (stored === 'false') return false;
+
+  // Legacy migration: honour previous "Floating tiles" preference once.
+  return window.localStorage.getItem(LEGACY_FLAT_CHROME_KEY) === 'true';
 }
 
 class SettingsStore {
@@ -34,7 +41,7 @@ class SettingsStore {
   pollIntervalMs = $state<number>(3000);
   autoEnterPwnDfu = $state<boolean>(false);
   reduceMotion = $state<boolean>(loadReduceMotion());
-  flatChrome = $state<boolean>(loadFlatChrome());
+  glassChrome = $state<boolean>(loadGlassChrome());
   workspaceRoot = $state<string | null>(null);
   onboarded = $state<boolean>(false);
   loaded = $state<boolean>(false);
@@ -52,10 +59,10 @@ class SettingsStore {
     }
   }
 
-  setFlatChrome(value: boolean) {
-    this.flatChrome = value;
+  setGlassChrome(value: boolean) {
+    this.glassChrome = value;
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(FLAT_CHROME_KEY, value ? 'true' : 'false');
+      window.localStorage.setItem(GLASS_CHROME_KEY, value ? 'true' : 'false');
     }
   }
 
