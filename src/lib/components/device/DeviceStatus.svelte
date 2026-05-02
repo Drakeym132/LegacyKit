@@ -8,7 +8,8 @@
   } = $props();
 
   let statusColor = $derived(connected ? getStatusColor(mode) : 'var(--color-danger)');
-  let label = $derived(connected ? `Connected · ${mode}` : 'Disconnected');
+  let modeLabel = $derived(mode === 'Normal' ? 'Booted' : mode);
+  let label = $derived(connected ? `Connected · ${modeLabel}` : 'Disconnected');
 
   function getStatusColor(m: string): string {
     switch(m) {

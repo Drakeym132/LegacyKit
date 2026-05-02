@@ -3,7 +3,7 @@ use crate::models::settings::{AppSettings, SetWorkspaceRootRequest, WorkspacePat
 use crate::services::{app_settings, workspace};
 use std::path::PathBuf;
 use std::process::Command;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 #[tauri::command]
 pub async fn get_app_settings(app: AppHandle) -> Result<AppSettings, AppError> {
@@ -74,6 +74,38 @@ pub async fn reveal_workspace(app: AppHandle) -> Result<(), AppError> {
 #[tauri::command]
 pub async fn pick_workspace_root(_app: AppHandle) -> Result<Option<String>, AppError> {
     Ok(None)
+}
+
+#[tauri::command]
+pub async fn set_window_shadow(app: AppHandle, enabled: bool) -> Result<(), AppError> {
+    #[cfg(target_os = "macos")]
+    {
+        use objc::runtime::Object;
+        use objc::{msg_send, sel, sel_impl};
+
+        let app_handle = app.clone();
+        app.run_on_main_thread(move || {
+            if let Some(window) = app_handle.get_webview_window("main") {
+                if let Ok(ns_window) = window.ns_window() {
+                    let ns_window = ns_window as *mut Object;
+                    if !ns_window.is_null() {
+                        unsafe {
+                            let _: () = msg_send![ns_window, setHasShadow: enabled];
+                            let _: () = msg_send![ns_window, invalidateShadow];
+                        }
+                    }
+                }
+            }
+        })
+        .map_err(|err| AppError::CommandFailed(format!("Failed to run shadow toggle on main thread: {err}")))?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, enabled);
+    }
+
+    Ok(())
 }
 
 fn layout_paths(layout: &workspace::WorkspaceLayout) -> WorkspacePaths {

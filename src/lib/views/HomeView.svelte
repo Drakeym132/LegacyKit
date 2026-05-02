@@ -108,7 +108,7 @@
       <h1 class="device-name">{deviceName}</h1>
       <div class="status-pill" data-mode={deviceMode}>
         <span class="status-dot" aria-hidden="true"></span>
-        <span>Connected · {deviceMode}</span>
+        <span>Connected · {deviceMode === 'Normal' ? 'Booted' : deviceMode}</span>
       </div>
     </header>
 

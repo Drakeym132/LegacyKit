@@ -37,3 +37,6 @@ export function revealWorkspace(): Promise<void> {
   return invoke<void>('reveal_workspace');
 }
 
+export function setWindowShadow(enabled: boolean): Promise<void> {
+  return invoke<void>('set_window_shadow', { enabled });
+}

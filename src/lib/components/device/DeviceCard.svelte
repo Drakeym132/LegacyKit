@@ -1,5 +1,6 @@
 <script lang="ts">
   import DeviceStatus from './DeviceStatus.svelte';
+  import DeviceImage from './DeviceImage.svelte';
   import { deviceStore } from '../../stores/deviceStore.svelte';
   import { getDeviceFriendlyName } from '../../utils/deviceModels';
 
@@ -17,11 +18,19 @@
   let batteryCapacity = $derived(deviceStore.state.battery_current_capacity);
   let activationState = $derived(deviceStore.state.activation_state || '');
   let cpid = $derived(deviceStore.state.cpid || '');
+  let productType = $derived(deviceStore.state.product_type);
+  let deviceColor = $derived(deviceStore.state.device_color);
 </script>
 
 <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius-lg)] p-3 shadow-sm transition-all duration-200 {isConnected ? 'ring-1 ring-[var(--color-accent)] ring-opacity-30' : ''}">
   <div class="flex items-center gap-2">
-    <div class="text-2xl w-10 h-10 flex items-center justify-center bg-[var(--color-bg-secondary)] rounded-[var(--radius-sm)]">📱</div>
+    <div class="w-10 h-10 flex items-center justify-center shrink-0">
+      {#if isConnected && productType}
+        <DeviceImage {productType} {deviceColor} width={40} height={40} />
+      {:else}
+        <span class="text-2xl leading-none">📱</span>
+      {/if}
+    </div>
     <div class="flex-1 min-w-0">
       {#if isConnected}
         <h3 class="m-0 text-[14px] font-semibold text-[var(--color-text-primary)] truncate">{deviceName}</h3>
@@ -41,7 +50,7 @@
     {/if}
     <div class="flex justify-between items-center text-[12px] mb-1">
       <span class="text-[var(--color-text-secondary)]">Mode</span>
-      <span class="font-medium text-[var(--color-text-primary)]">
+      <span class="font-medium text-[var(--color-text-primary)] -mr-2">
         <DeviceStatus mode={deviceMode} connected={isConnected} />
       </span>
     </div>

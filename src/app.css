@@ -32,6 +32,29 @@
   --spacing-lg: 24px;
   --spacing-xl: 32px;
 
+  /* Shell layout — outer chrome of the app window.
+   * Adjusting these tokens shifts every panel inside the root layout
+   * (sidebar + main content) in lockstep, so spacing stays balanced.
+   *   --shell-inset      : left / right / bottom padding of the window
+   *   --shell-inset-top  : top inset above the sidebar and main panel
+   *                        (kept small so the sidebar can extend up under
+   *                        the macOS traffic-light buttons)
+   *   --shell-gap        : horizontal space between sidebar and content
+   */
+  --shell-inset: 10px;
+  --shell-inset-top: 8px;
+  --shell-gap: 15px;
+
+  /* Outer chrome surface — the rounded backdrop sitting behind the sidebar
+   * and content panels. Set to transparent + zero insets when the user
+   * disables the chrome layer via Settings → Appearance. */
+  --shell-bg: var(--color-bg-primary);
+  --shell-radius: 28px;
+  --content-radius: 20px;
+  --content-border: 1px solid var(--color-border);
+  --content-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.18),
+                    0 2px 6px -2px rgba(0, 0, 0, 0.10);
+
   /* Control sizing — keeps inputs / selects / buttons / toggle pills
    * visually aligned in rows. Every form control across the app should
    * resolve to exactly --control-h so mixed rows stay clean. */
@@ -61,6 +84,14 @@
   --color-border: #38383A;
 }
 
+/* Flat chrome — removes only the rounded backdrop layer behind the sidebar
+ * and content panels, so the two tiles appear floating directly over the
+ * window. Insets, gaps, panel radii, borders, and shadows are preserved.
+ * Toggled via Settings → Appearance. */
+:root[data-flat-chrome="true"] {
+  --shell-bg: transparent;
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
     /* Backgrounds */
@@ -80,6 +111,10 @@
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  background-color: transparent;
 }
 
 body {

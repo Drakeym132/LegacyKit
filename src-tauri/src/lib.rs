@@ -10,7 +10,7 @@ const WINDOW_CORNER_RADIUS: f64 = 28.0;
 
 #[cfg(target_os = "macos")]
 fn apply_window_corner_radius(window: &tauri::WebviewWindow) {
-    use objc::runtime::{Object, NO, YES};
+    use objc::runtime::{Object, Sel, NO, YES};
     use objc::{class, msg_send, sel, sel_impl};
 
     let Ok(ns_window) = window.ns_window() else { return };
@@ -44,6 +44,49 @@ fn apply_window_corner_radius(window: &tauri::WebviewWindow) {
         let _: () = msg_send![layer, setBackgroundColor: clear_cg];
     }
 
+    // Ensure AppKit views in the hierarchy are also transparent (not just the
+    // NSWindow container), otherwise a white NSView/WKWebView background can
+    // still show through even when the window itself is transparent.
+    unsafe fn clear_view_background_recursive(view: *mut Object) {
+        if view.is_null() { return; }
+
+        unsafe fn responds_to(view: *mut Object, selector: Sel) -> bool {
+            if view.is_null() { return false; }
+            msg_send![view, respondsToSelector: selector]
+        }
+
+        let ns_color_cls = class!(NSColor);
+        let clear_ns: *mut Object = msg_send![ns_color_cls, clearColor];
+
+        if responds_to(view, sel!(setWantsLayer:)) {
+            let _: () = msg_send![view, setWantsLayer: YES];
+            let layer: *mut Object = msg_send![view, layer];
+            if !layer.is_null() {
+                let clear_cg: *mut Object = msg_send![clear_ns, CGColor];
+                let _: () = msg_send![layer, setBackgroundColor: clear_cg];
+            }
+        }
+
+        if responds_to(view, sel!(setBackgroundColor:)) {
+            let _: () = msg_send![view, setBackgroundColor: clear_ns];
+        }
+
+        if responds_to(view, sel!(setDrawsBackground:)) {
+            let _: () = msg_send![view, setDrawsBackground: NO];
+        }
+
+        if responds_to(view, sel!(subviews)) {
+            let subviews: *mut Object = msg_send![view, subviews];
+            if !subviews.is_null() {
+                let count: usize = msg_send![subviews, count];
+                for idx in 0..count {
+                    let child: *mut Object = msg_send![subviews, objectAtIndex: idx];
+                    clear_view_background_recursive(child);
+                }
+            }
+        }
+    }
+
     unsafe {
         let content_view: *mut Object = msg_send![ns_window, contentView];
         if content_view.is_null() { return; }
@@ -57,6 +100,8 @@ fn apply_window_corner_radius(window: &tauri::WebviewWindow) {
 
         neutralize_layer_chrome(content_view);
         neutralize_layer_chrome(frame_view);
+        clear_view_background_recursive(frame_view);
+        clear_view_background_recursive(content_view);
 
         // Re-assert window-level transparency in case AppKit re-derived a
         // non-clear backing color after we touched the frame_view's layer.
@@ -144,6 +189,7 @@ pub fn run() {
             commands::settings::complete_onboarding,
             commands::settings::ensure_workspace_layout,
             commands::settings::reveal_workspace,
+            commands::settings::set_window_shadow,
             commands::trollstore::prepare_trollstore_assets,
             commands::trollstore::check_trollstore_eligibility,
             commands::updates::check_for_updates,

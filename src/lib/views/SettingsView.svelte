@@ -86,6 +86,14 @@
   function handleRestartOnboarding() {
     settingsStore.restartOnboarding();
   }
+
+  function handleReduceMotionToggle() {
+    settingsStore.setReduceMotion(!settingsStore.reduceMotion);
+  }
+
+  function handleFlatChromeToggle() {
+    settingsStore.setFlatChrome(!settingsStore.flatChrome);
+  }
 </script>
 
 <div class="view view--narrow">
@@ -105,6 +113,40 @@
         <option value="light">Light</option>
         <option value="dark">Dark</option>
       </select>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <label for="flat-chrome-toggle">Floating tiles</label>
+        <span class="setting-hint">Hide the background layer behind the sidebar and content so they float over the window</span>
+      </div>
+      <label class="toggle">
+        <input
+          id="flat-chrome-toggle"
+          type="checkbox"
+          checked={settingsStore.flatChrome}
+          onchange={handleFlatChromeToggle}
+        />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="settings-group">
+    <h3>Accessibility</h3>
+    <div class="setting-row">
+      <div class="setting-info">
+        <label for="reduce-motion-toggle">Reduce Motion</label>
+        <span class="setting-hint">Disable view-scroll, sidebar slide, and other UI animations</span>
+      </div>
+      <label class="toggle">
+        <input
+          id="reduce-motion-toggle"
+          type="checkbox"
+          checked={settingsStore.reduceMotion}
+          onchange={handleReduceMotionToggle}
+        />
+        <span class="toggle-slider"></span>
+      </label>
     </div>
   </div>
 

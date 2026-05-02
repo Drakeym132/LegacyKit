@@ -35,7 +35,53 @@
 
   let currentSrc = $derived(sources[attempt] ?? null);
 
+  // ---- Module-level decoded-image cache ----
+  // Keeps an `HTMLImageElement` reference per URL so the browser retains the
+  // decoded bitmap across HomeView remounts (the `{#key}` carousel transition
+  // destroys/recreates the DOM each time the user navigates back to Home).
+  // Without this, every visit triggers a fresh network/decode pass and the
+  // device image flashes in late.
+  const decodedCache = (
+    globalThis as unknown as { __lkDeviceImgCache?: Map<string, HTMLImageElement> }
+  ).__lkDeviceImgCache ??
+    ((globalThis as unknown as { __lkDeviceImgCache?: Map<string, HTMLImageElement> })
+      .__lkDeviceImgCache = new Map<string, HTMLImageElement>());
+
+  const failedCache = (
+    globalThis as unknown as { __lkDeviceImgFailed?: Set<string> }
+  ).__lkDeviceImgFailed ??
+    ((globalThis as unknown as { __lkDeviceImgFailed?: Set<string> })
+      .__lkDeviceImgFailed = new Set<string>());
+
+  // Whether the current src has been decoded at least once (synchronous answer).
+  let isWarm = $derived(currentSrc !== null && decodedCache.has(currentSrc));
+
+  // Warm the cache for any new src. Skipping URLs we've already failed on so
+  // we move straight to the next fallback.
+  $effect(() => {
+    const src = currentSrc;
+    if (!src) return;
+    if (failedCache.has(src)) {
+      handleError();
+      return;
+    }
+    if (decodedCache.has(src)) return;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+    img
+      .decode()
+      .then(() => {
+        decodedCache.set(src, img);
+      })
+      .catch(() => {
+        failedCache.add(src);
+        handleError();
+      });
+  });
+
   function handleError() {
+    if (currentSrc) failedCache.add(currentSrc);
     if (attempt < sources.length - 1) attempt += 1;
     else attempt = sources.length; // exhausted -> render SVG fallback
   }
@@ -48,8 +94,9 @@
     alt={productType ?? 'Device'}
     {width}
     {height}
-    loading="lazy"
-    decoding="async"
+    loading="eager"
+    fetchpriority="high"
+    decoding={isWarm ? 'sync' : 'async'}
     onerror={handleError}
   />
 {:else}
@@ -89,9 +136,5 @@
     width: auto;
     max-width: 100%;
     max-height: 100%;
-    filter:
-      drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2))
-      drop-shadow(0 14px 18px rgba(0, 0, 0, 0.22))
-      drop-shadow(0 28px 32px rgba(0, 0, 0, 0.16));
   }
 </style>

@@ -7,6 +7,25 @@ import {
   type WorkspacePaths,
 } from '$lib/api/settings';
 
+const REDUCE_MOTION_KEY = 'legacykit.reduceMotion';
+const FLAT_CHROME_KEY = 'legacykit.flatChrome';
+
+function loadReduceMotion(): boolean {
+  if (typeof window === 'undefined') return false;
+  const stored = window.localStorage.getItem(REDUCE_MOTION_KEY);
+  if (stored === 'true') return true;
+  if (stored === 'false') return false;
+  // No explicit user preference yet — default to the OS setting so users who
+  // already have "Reduce motion" enabled system-wide get the right behaviour
+  // out of the box.
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
+function loadFlatChrome(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(FLAT_CHROME_KEY) === 'true';
+}
+
 class SettingsStore {
   theme = $state<'system' | 'light' | 'dark'>('system');
   terminalVisible = $state<boolean>(false);
@@ -14,6 +33,8 @@ class SettingsStore {
   autoDetectDevice = $state<boolean>(true);
   pollIntervalMs = $state<number>(3000);
   autoEnterPwnDfu = $state<boolean>(false);
+  reduceMotion = $state<boolean>(loadReduceMotion());
+  flatChrome = $state<boolean>(loadFlatChrome());
   workspaceRoot = $state<string | null>(null);
   onboarded = $state<boolean>(false);
   loaded = $state<boolean>(false);
@@ -22,6 +43,20 @@ class SettingsStore {
 
   setTheme(theme: 'system' | 'light' | 'dark') {
     this.theme = theme;
+  }
+
+  setReduceMotion(value: boolean) {
+    this.reduceMotion = value;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(REDUCE_MOTION_KEY, value ? 'true' : 'false');
+    }
+  }
+
+  setFlatChrome(value: boolean) {
+    this.flatChrome = value;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(FLAT_CHROME_KEY, value ? 'true' : 'false');
+    }
   }
 
   toggleTerminal() {

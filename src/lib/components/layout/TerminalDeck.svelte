@@ -126,6 +126,9 @@
 </div>
 
 <style>
+  .terminal-deck {
+    box-shadow: 0 -10px 10px rgba(0, 0, 0, 0.06), 0 -1px 0 rgba(0, 0, 0, 0.04);
+  }
   .terminal-header {
     color: var(--color-text-secondary);
     background: var(--color-bg-secondary);
@@ -178,3 +181,4 @@
     }
   }
 </style>
+

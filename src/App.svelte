@@ -12,6 +12,7 @@
   import type { LogEventPayload } from './lib/stores/logStore.svelte';
   import { logStore } from './lib/stores/logStore.svelte';
   import { settingsStore } from './lib/stores/settingsStore.svelte';
+  import { setWindowShadow } from './lib/api/settings';
   
   import './app.css';
 
@@ -59,6 +60,21 @@
     return () => darkQuery.removeEventListener('change', applyTheme);
   });
 
+  $effect(() => {
+    const root = document.documentElement;
+    const flatChrome = settingsStore.flatChrome;
+    if (flatChrome) {
+      root.dataset.flatChrome = 'true';
+    } else {
+      delete root.dataset.flatChrome;
+    }
+
+    void setWindowShadow(!flatChrome).catch(() => {
+      // Non-fatal: shadow toggling is a cosmetic enhancement on supported
+      // platforms and should never block rendering.
+    });
+  });
+
   onMount(() => {
     void settingsStore.load();
 
@@ -86,9 +102,9 @@
   }
 </script>
 
-<div class="flex h-screen w-screen overflow-hidden rounded-[28px] bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] gap-2 p-2 pt-0">
+<div class="app-shell">
   <Sidebar />
-  <div class="flex flex-col flex-1 overflow-hidden rounded-[20px] bg-[var(--color-bg-elevated)] border border-[var(--color-border)] mt-2">
+  <div class="app-content">
     <Toolbar />
     <ContentArea />
   </div>
@@ -98,3 +114,29 @@
 {#if settingsStore.loaded && !settingsStore.onboarded}
   <WorkspaceOnboarding />
 {/if}
+
+<style>
+  .app-shell {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    color: var(--color-text-primary);
+    background-color: var(--shell-bg);
+    border-radius: var(--shell-radius);
+    gap: var(--shell-gap);
+    padding: 0 var(--shell-inset) var(--shell-inset);
+  }
+
+  .app-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    background-color: var(--color-bg-elevated);
+    border: var(--content-border);
+    border-radius: var(--content-radius);
+    margin-top: var(--shell-inset-top);
+    box-shadow: var(--content-shadow);
+  }
+</style>
