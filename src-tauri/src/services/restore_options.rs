@@ -1,9 +1,10 @@
 use crate::models::device::DeviceInfo;
 use crate::models::restore::{RestoreOption, RestoreOptionKind, RestoreOptionsResponse};
+use crate::services::device_meta::infer_processor_gen;
 
 pub fn determine_restore_options(device: DeviceInfo) -> RestoreOptionsResponse {
     let product_type = device.product_type.clone();
-    let processor_generation = product_type.as_deref().and_then(infer_processor_generation);
+    let processor_generation = product_type.as_deref().and_then(infer_processor_gen);
 
     let mut response = RestoreOptionsResponse {
         product_type,
@@ -376,58 +377,6 @@ fn can_use_powdersnow_blobs(product_type: &str) -> bool {
                 "iPod5,1",
             ],
         )
-}
-
-fn infer_processor_generation(product_type: &str) -> Option<u8> {
-    if matches_any(product_type, &["iPhone1,1", "iPhone1,2", "iPod1,1"]) {
-        return Some(1);
-    }
-    if matches_any(product_type, &["iPhone2,1", "iPod2,1"]) {
-        return Some(2);
-    }
-    if product_type == "iPod3,1" {
-        return Some(3);
-    }
-    if product_family_in(product_type, "iPhone3", 1..=3)
-        || product_type == "iPad1,1"
-        || product_type == "iPod4,1"
-    {
-        return Some(4);
-    }
-    if product_type == "iPhone4,1"
-        || product_family_in(product_type, "iPad2", 1..=7)
-        || product_family_in(product_type, "iPad3", 1..=3)
-        || product_type == "iPod5,1"
-    {
-        return Some(5);
-    }
-    if product_family_in(product_type, "iPhone5", 1..=4)
-        || product_family_in(product_type, "iPad3", 4..=6)
-    {
-        return Some(6);
-    }
-    if product_family_in(product_type, "iPhone6", 1..=2)
-        || product_family_in(product_type, "iPad4", 1..=9)
-    {
-        return Some(7);
-    }
-    if product_family_in(product_type, "iPhone7", 1..=2)
-        || product_type == "iPod7,1"
-        || product_family_in(product_type, "iPad5", 1..=4)
-    {
-        return Some(8);
-    }
-    if product_family_in(product_type, "iPhone8", 1..=4)
-        || product_family_in(product_type, "iPad6", 3..=12)
-    {
-        return Some(9);
-    }
-    if product_family_in(product_type, "iPhone9", 1..=4)
-        || product_family_in(product_type, "iPad7", 1..=4)
-    {
-        return Some(10);
-    }
-    None
 }
 
 fn matches_any(value: &str, candidates: &[&str]) -> bool {

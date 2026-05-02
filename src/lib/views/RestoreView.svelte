@@ -17,6 +17,7 @@
   import IpswDownloaderPanel from '$lib/components/restore/IpswDownloaderPanel.svelte';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
+  import { toastStore } from '$lib/stores/toastStore.svelte';
 
   let restoreOptions = $state<RestoreOptionsResponse | null>(null);
   let selectedIndex = $state(0);
@@ -45,6 +46,9 @@
   let isPreparing = $state(false);
   let prepResult = $state<IpswPrepareResult | null>(null);
 
+  // Track previous device state to avoid unnecessary refetches
+  let prevDeviceKey = { product_type: null as string | null, mode: null as string | null, pwnd: null as string | null, ios_version: null as string | null };
+
   let selectedOption = $derived(restoreOptions?.options[selectedIndex] ?? null);
   let needsPrepStep = $derived(selectedOption?.kind === 'powdersnow');
   let effectiveIpswPath = $derived(prepResult?.outputPath || ipswPath);
@@ -57,7 +61,23 @@
   let canRun = $derived(!!preview && !isWorking && !isPreparing);
 
   $effect(() => {
-    const device = { ...deviceStore.state };
+    const device = deviceStore.state;
+    const key = {
+      product_type: device.product_type,
+      mode: device.mode,
+      pwnd: device.pwnd,
+      ios_version: device.ios_version,
+    };
+    // Only reload if material device fields changed
+    if (
+      prevDeviceKey.product_type === key.product_type &&
+      prevDeviceKey.mode === key.mode &&
+      prevDeviceKey.pwnd === key.pwnd &&
+      prevDeviceKey.ios_version === key.ios_version
+    ) {
+      return;
+    }
+    prevDeviceKey = key;
     void loadRestoreOptions(device);
   });
 
@@ -87,6 +107,8 @@
       if (currentRequest === requestId) {
         errorMessage = error instanceof Error ? error.message : String(error);
         restoreOptions = null;
+        logStore.append(`Failed to load restore options: ${errorMessage}`, 'stderr');
+        toastStore.error('Failed to load restore options', errorMessage);
       }
     } finally {
       if (currentRequest === requestId) {
@@ -121,6 +143,7 @@
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
       logStore.append(`Download failed: ${errorMessage}`, 'stderr');
+      toastStore.error('Download failed', errorMessage);
     } finally {
       isWorking = false;
     }
@@ -138,9 +161,11 @@
         expectedSha1: expectedSha1 || null,
       });
       logStore.append(`IPSW SHA-1: ${verifyResult.calculatedSha1}`, 'info');
+      toastStore.success('IPSW verified', `SHA-1: ${verifyResult.calculatedSha1}`);
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
       logStore.append(`Verification failed: ${errorMessage}`, 'stderr');
+      toastStore.error('Verification failed', errorMessage);
     } finally {
       isWorking = false;
     }
@@ -154,9 +179,15 @@
     try {
       preview = await previewRestoreCommand(request);
       logStore.append(`Restore command: ${preview.binary} ${preview.args.join(' ')}`, 'info');
+      if (dryRun) {
+        toastStore.success('Command preview ready', `${preview.binary} ${preview.args.slice(0, 3).join(' ')}...`);
+      }
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
       logStore.append(`Preview failed: ${errorMessage}`, 'stderr');
+      if (dryRun) {
+        toastStore.error('Preview failed', errorMessage);
+      }
     } finally {
       isWorking = false;
     }
@@ -169,9 +200,12 @@
 
     try {
       preview = await startRestore(request);
+      logStore.append('Restore completed successfully', 'info');
+      toastStore.success('Restore completed', 'The restore operation finished successfully');
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
       logStore.append(`Restore failed: ${errorMessage}`, 'stderr');
+      toastStore.error('Restore failed', errorMessage);
     } finally {
       isWorking = false;
     }
@@ -218,9 +252,11 @@
         deviceEcid: device.ecid || null,
       });
       logStore.append(`Custom IPSW ready: ${prepResult.outputPath}`, 'info');
+      toastStore.success('Custom IPSW ready', prepResult.outputPath);
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
       logStore.append(`Preparation failed: ${errorMessage}`, 'stderr');
+      toastStore.error('IPSW preparation failed', errorMessage);
     } finally {
       isPreparing = false;
     }

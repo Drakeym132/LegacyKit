@@ -35,27 +35,43 @@ pub async fn check_for_updates(
     }
 
     let api_url = format!("https://api.github.com/repos/{repo}/releases/latest");
-    let curl = which("curl")
-        .ok_or_else(|| AppError::CommandFailed("curl is required to query GitHub".into()))?;
+    let curl = which("curl").ok_or_else(|| {
+        AppError::CommandFailed(
+            "curl is required to query GitHub for updates. Install curl or set GITHUB_TOKEN to use authenticated requests.".into(),
+        )
+    })?;
+
+    // Build curl arguments, optionally including Authorization header if GITHUB_TOKEN is set
+    let github_token = std::env::var("GITHUB_TOKEN").ok();
+    let mut args = vec![
+        "-fsSL".to_string(),
+        "-H".to_string(),
+        "Accept: application/vnd.github+json".to_string(),
+        "-A".to_string(),
+        "legacykit".to_string(),
+    ];
+    if let Some(ref token) = github_token {
+        args.push("-H".to_string());
+        args.push(format!("Authorization: Bearer {token}"));
+    }
+    args.push(api_url.clone());
+
     let output = Command::new(&curl)
-        .args([
-            "-fsSL",
-            "-H",
-            "Accept: application/vnd.github+json",
-            "-A",
-            "legacykit",
-            &api_url,
-        ])
+        .args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()?;
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(AppError::CommandFailed(if stderr.is_empty() {
-            format!("curl exited with {}", output.status)
-        } else {
-            stderr
-        }));
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_lowercase();
+        return Err(AppError::CommandFailed(
+            if stderr.contains("403") || stderr.contains("rate limit") {
+                "GitHub rate limit exceeded. Set GITHUB_TOKEN to raise the anonymous limit (60 req/h → 5000 req/h).".into()
+            } else if stderr.is_empty() {
+                format!("curl exited with {}", output.status)
+            } else {
+                stderr
+            },
+        ));
     }
     let body = String::from_utf8_lossy(&output.stdout);
     let latest = parse_json_string(&body, "tag_name")
@@ -166,5 +182,13 @@ mod tests {
             parse_json_string(body, "html_url").as_deref(),
             Some("https://github.com/x/y/releases/tag/1.2.3"),
         );
+    }
+
+    #[test]
+    fn mixed_v_prefix_comparison() {
+        // Explicit test: leading 'v' on only one side should still compare correctly
+        assert_eq!(compare_versions("v1.0.0", "1.0.1"), Ordering::Less);
+        assert_eq!(compare_versions("1.0.0", "v1.0.1"), Ordering::Less);
+        assert_eq!(compare_versions("v2.0.0", "1.5.0"), Ordering::Greater);
     }
 }

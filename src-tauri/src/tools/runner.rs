@@ -64,12 +64,16 @@ pub fn run_streaming(app: &AppHandle, binary: PathBuf, args: &[String]) -> Resul
     let _ = stderr_thread.join();
 
     if !status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "{} exited with status {}",
+        let msg = format!(
+            "{} {} exited with status {}",
             binary.display(),
+            args.join(" "),
             status
-        )));
+        );
+        emit_log(app, "stderr", &msg);
+        return Err(AppError::CommandFailed(msg));
     }
 
+    emit_log(app, "info", &format!("{} finished ok", binary.display()));
     Ok(())
 }

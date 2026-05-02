@@ -1,6 +1,7 @@
 use crate::error::AppError;
 use crate::models::settings::{AppSettings, SetWorkspaceRootRequest, WorkspacePaths};
 use crate::services::{app_settings, workspace};
+use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use tauri::{AppHandle, Manager};
@@ -16,9 +17,8 @@ pub async fn set_workspace_root(
     request: SetWorkspaceRootRequest,
 ) -> Result<AppSettings, AppError> {
     let path = request.path.trim();
-    if path.is_empty() {
-        return Err(AppError::Parse("Workspace path is required".to_string()));
-    }
+
+    validate_workspace_path(path)?;
 
     let mut settings = app_settings::load(&app)?;
     let root = PathBuf::from(path);
@@ -28,6 +28,63 @@ pub async fn set_workspace_root(
     settings.workspace_root = Some(root);
     app_settings::save(&app, &settings)?;
     Ok(settings)
+}
+
+/// Validates that a workspace path can be created.
+/// - Rejects empty strings (after trimming)
+/// - Checks that parent directory exists and is writable
+/// - Canonicalizes if the path exists; otherwise leaves as-is for first-run setup
+fn validate_workspace_path(path: &str) -> Result<(), AppError> {
+    let path = path.trim();
+    if path.is_empty() {
+        return Err(AppError::Parse("Workspace path cannot be empty".into()));
+    }
+
+    let root = PathBuf::from(path);
+
+    // If the path already exists, canonicalize it
+    let root = if root.exists() {
+        root.canonicalize().unwrap_or(root)
+    } else {
+        root
+    };
+
+    // Check parent directory
+    let parent = root.parent().ok_or_else(|| {
+        AppError::Parse(format!(
+            "Cannot create workspace at {path}: parent directory does not exist or is not writable"
+        ))
+    })?;
+
+    // Parent must exist and be a directory
+    let metadata = fs::metadata(parent).map_err(|_| {
+        AppError::Parse(format!(
+            "Cannot create workspace at {path}: parent directory does not exist or is not writable"
+        ))
+    })?;
+
+    if !metadata.is_dir() {
+        return Err(AppError::Parse(format!(
+            "Cannot create workspace at {path}: parent directory does not exist or is not writable"
+        )));
+    }
+
+    // Test write permission by creating and removing a temp marker file
+    let marker_name = format!(".legacykit-write-test-{}", std::process::id());
+    let marker_path = parent.join(&marker_name);
+    let write_ok = fs::write(&marker_path, b"").is_ok();
+    if write_ok {
+        // Suppress errors on cleanup
+        let _ = fs::remove_file(&marker_path);
+    }
+
+    if !write_ok {
+        return Err(AppError::Parse(format!(
+            "Cannot create workspace at {path}: parent directory does not exist or is not writable"
+        )));
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -143,5 +200,61 @@ fn layout_paths(layout: &workspace::WorkspaceLayout) -> WorkspacePaths {
         backups: layout.backups_dir(None).to_string_lossy().to_string(),
         logs: layout.logs_dir().to_string_lossy().to_string(),
         tmp: layout.tmp_dir().to_string_lossy().to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn empty_string_returns_parse_error() {
+        let result = validate_workspace_path("");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        match err {
+            AppError::Parse(msg) => assert_eq!(msg, "Workspace path cannot be empty"),
+            _ => panic!("Expected Parse error"),
+        }
+    }
+
+    #[test]
+    fn whitespace_only_returns_parse_error() {
+        let result = validate_workspace_path("   ");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        match err {
+            AppError::Parse(msg) => assert_eq!(msg, "Workspace path cannot be empty"),
+            _ => panic!("Expected Parse error"),
+        }
+    }
+
+    #[test]
+    fn non_existent_parent_returns_parse_error() {
+        let result = validate_workspace_path("/nonexistent/path/to/workspace");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        match err {
+            AppError::Parse(msg) => {
+                assert!(msg.contains("Cannot create workspace at"));
+                assert!(msg.contains("parent directory does not exist or is not writable"));
+            }
+            _ => panic!("Expected Parse error"),
+        }
+    }
+
+    #[test]
+    fn valid_temp_dir_succeeds() {
+        let temp_base = std::env::temp_dir();
+        let unique_subpath = format!("legacykit-test-{}-{}", std::process::id(), uuid::Uuid::new_v4());
+        let workspace_path = temp_base.join(&unique_subpath);
+        let path_str = workspace_path.to_string_lossy().to_string();
+
+        let result = validate_workspace_path(&path_str);
+        assert!(result.is_ok(), "Expected validation to succeed for temp dir path");
+
+        // Cleanup if the test created anything
+        let _ = fs::remove_dir_all(&workspace_path);
     }
 }

@@ -1,13 +1,21 @@
+import type { RestoreOptionsResponse } from '$lib/api/restore';
+
 /**
- * Maps an Apple device's product type (e.g. "iPhone6,1") to its processor
- * generation number (4 = A4, 6 = A6, 10 = A10).
- *
- * Mirrors `infer_processor_gen` in `src-tauri/src/services/device_meta.rs`.
+ * Extract processor generation from a RestoreOptionsResponse.
+ * This is the preferred way to get processor generation since the backend
+ * already computes it via infer_processor_gen.
  */
+export function processorGenFromResponse(response: RestoreOptionsResponse): number | null {
+  return response.processorGeneration ?? null;
+}
+
 /**
  * Infer processor generation from device product type.
  * @param product - Apple device product identifier (e.g. "iPhone6,1")
  * @returns Processor generation number or null if unknown
+ * @deprecated Use processorGenFromResponse with a RestoreOptionsResponse when available,
+ *   as the backend already computes this value. This function remains for components
+ *   that don't have access to restore options (e.g., JustBootDialog, PwnDfuHelper).
  */
 export function inferProcessorGen(product: string | null): number | null {
   if (!product) return null;
