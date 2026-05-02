@@ -4,6 +4,11 @@
  *
  * Mirrors `infer_processor_gen` in `src-tauri/src/services/device_meta.rs`.
  */
+/**
+ * Infer processor generation from device product type.
+ * @param product - Apple device product identifier (e.g. "iPhone6,1")
+ * @returns Processor generation number or null if unknown
+ */
 export function inferProcessorGen(product: string | null): number | null {
   if (!product) return null;
   if (/^iPhone(1|2),/.test(product) || /^iPod(1|2),/.test(product)) return 1;
