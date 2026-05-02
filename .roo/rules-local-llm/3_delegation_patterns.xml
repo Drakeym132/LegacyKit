@@ -1,0 +1,46 @@
+<delegation_patterns>
+  <overview>
+    Templates the invoking model (or user) should follow when handing a task to this mode.
+    A well-formed handoff is the single biggest factor in keeping the local model effective.
+  </overview>
+
+  <good_handoff_template>
+    <description>What a frontier model should send when delegating to local-llm.</description>
+    <fields>
+      <field name="task_type">one of: scaffold | edit | rename | extract | comment | summarize</field>
+      <field name="target_path">workspace-relative path (single file for edit/rename/extract/comment; new path for scaffold)</field>
+      <field name="anchor">For edit/extract: the function name, line number, or exact snippet to locate. For comment: the symbol to document.</field>
+      <field name="spec">Concrete description of what to produce. Include signatures, props, types, return shapes — do not leave them implicit.</field>
+      <field name="constraints">Style notes (e.g., "match existing imports", "Svelte 5 runes", "no new deps").</field>
+    </fields>
+    <example>
+      task_type: scaffold
+      target_path: src/lib/components/common/Spinner.svelte
+      spec: Svelte 5 component. Props: { size?: number = 16, label?: string }. Renders an aria-live spinner using existing CSS tokens (--color-accent). Uses runes ($props).
+      constraints: Match style of src/lib/components/common/ProgressBar.svelte (sibling reference; you MAY read this one file).
+    </example>
+  </good_handoff_template>
+
+  <refusal_examples>
+    <example>
+      <bad_request>"Refactor the device store to use a new pattern."</bad_request>
+      <response>Out of scope (multi-file reasoning). Hand back to Code or Architect mode.</response>
+    </example>
+    <example>
+      <bad_request>"Find where DFU mode is handled and fix the bug."</bad_request>
+      <response>Out of scope (exploration + debugging). Hand back to Debug mode.</response>
+    </example>
+    <example>
+      <bad_request>"Add a prop to DeviceCard."</bad_request>
+      <response>Need: exact prop name, type, default, and where it should render. Provide and re-invoke.</response>
+    </example>
+  </refusal_examples>
+
+  <self_check>
+    Before reading any file or producing output, silently confirm:
+    1. The task is on the whitelist.
+    2. Every required input is present.
+    3. The work fits in ONE file (or is a pure-output task like a summary).
+    If any answer is no: refuse or ask one question. Do not proceed.
+  </self_check>
+</delegation_patterns>

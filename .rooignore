@@ -1,0 +1,32 @@
+# .rooignore — paths excluded from Roo's workspace listing and tool access.
+# Mirrors gitignore syntax. Reduces prompt overhead by hiding vendored
+# binaries, icons, and large asset trees from the file tree Roo injects
+# into every model request.
+
+# Vendored Tauri sidecar binaries (Linux/macOS, all architectures)
+src-tauri/binaries/
+
+# App icons (large PNG/ICNS set, never edited by Roo)
+src-tauri/icons/
+
+# Embedded image3 firmware blobs
+src-tauri/image3/
+
+# Firmware sources, kloader binaries, and patch trees
+resources/firmware/
+resources/kloader/
+resources/patch/
+
+# Device thumbnail images
+public/devices/
+
+# Build outputs and dependency caches (defensive — usually already gitignored)
+node_modules/
+dist/
+build/
+src-tauri/target/
+.svelte-kit/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
