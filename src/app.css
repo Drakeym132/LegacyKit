@@ -12,6 +12,13 @@
   --color-bg-secondary: #F5F5F7;
   --color-bg-sidebar: rgba(246, 246, 246, 0.8);
   --color-bg-elevated: #FFFFFF;
+
+  /* RGB triples used to compute panel backgrounds when glass chrome is on.
+   * Theme blocks below override these; the opacity is taken from the
+   * --sidebar-opacity / --content-opacity vars set by the glass-chrome rule
+   * (and overridden inline by the opacity sliders in Settings). */
+  --sidebar-rgb: 246 246 246;
+  --content-rgb: 255 255 255;
   
   /* Text */
   --color-text-primary: #1D1D1F;
@@ -78,26 +85,43 @@
   --color-bg-secondary: #2C2C2E;
   --color-bg-sidebar: rgba(44, 44, 46, 0.82);
   --color-bg-elevated: #2C2C2E;
+  --sidebar-rgb: 44 44 46;
+  --content-rgb: 44 44 46;
   --shell-bg: radial-gradient(130% 130% at 20% 20%, #1f1f22 0%, #1a1a1d 40%, #111113 100%);
   --color-text-primary: #F5F5F7;
   --color-text-secondary: #98989D;
   --color-border: #38383A;
 }
 
-/* Glass chrome — keeps the background chrome but makes panels translucent and blurred. */
+/* Glass chrome — drops the opaque shell gradient so the native macOS
+ * NSVisualEffectView installed behind the webview is visible, and tones the
+ * inner panels down so they layer cleanly on top of the frosted material.
+ *
+ * Panel surface colors are computed from a per-theme RGB triple
+ * (--sidebar-rgb / --content-rgb, set in the theme blocks below) and an
+ * opacity that the user controls via sliders in Settings. The slider writes
+ * inline styles for --sidebar-opacity / --content-opacity on :root, which
+ * override the defaults set here.
+ */
 :root[data-glass-chrome="true"] {
-  /* More translucent surfaces */
-  --color-bg-sidebar: rgba(246, 246, 246, 0.42);
-  --color-bg-elevated: rgba(255, 255, 255, 0.38);
+  --shell-bg: transparent;
+  --sidebar-opacity: 0.42;
+  --content-opacity: 0.38;
+  --color-bg-sidebar: rgb(var(--sidebar-rgb) / var(--sidebar-opacity));
+  --color-bg-elevated: rgb(var(--content-rgb) / var(--content-opacity));
   --color-border: rgba(210, 210, 215, 0.55);
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-glass-chrome="true"]:not([data-theme="light"]) {
-    --color-bg-sidebar: rgba(44, 44, 46, 0.42);
-    --color-bg-elevated: rgba(44, 44, 46, 0.38);
     --color-border: rgba(56, 56, 58, 0.55);
   }
+}
+
+/* Apply glass effect to content view backgrounds when glass chrome is enabled */
+:root[data-glass-chrome="true"] .content-shell {
+  backdrop-filter: blur(6px) saturate(180%);
+  -webkit-backdrop-filter: blur(6px) saturate(180%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -107,11 +131,13 @@
     --color-bg-secondary: #2C2C2E;
     --color-bg-sidebar: rgba(44, 44, 46, 0.8);
     --color-bg-elevated: #2C2C2E;
-    
+    --sidebar-rgb: 44 44 46;
+    --content-rgb: 44 44 46;
+
     /* Text */
     --color-text-primary: #F5F5F7;
     --color-text-secondary: #98989D;
-    
+
     /* Borders */
     --color-border: #38383A;
   }
