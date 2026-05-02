@@ -3,6 +3,7 @@
   import Sidebar from './lib/components/layout/Sidebar.svelte';
   import ContentArea from './lib/components/layout/ContentArea.svelte';
   import Toaster from './lib/components/common/Toaster.svelte';
+  import WorkspaceOnboarding from './lib/components/onboarding/WorkspaceOnboarding.svelte';
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
@@ -59,6 +60,8 @@
   });
 
   onMount(() => {
+    void settingsStore.load();
+
     const unlistenLog = listen<LogEventPayload>('log_event', (event) => {
       const { text, type } = event.payload;
       logStore.append(text, type);
@@ -91,3 +94,7 @@
   </div>
 </div>
 <Toaster />
+
+{#if settingsStore.loaded && !settingsStore.onboarded}
+  <WorkspaceOnboarding />
+{/if}

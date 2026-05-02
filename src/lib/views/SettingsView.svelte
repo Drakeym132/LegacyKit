@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { open as openDialog } from '@tauri-apps/plugin-dialog';
   import { settingsStore } from '$lib/stores/settingsStore.svelte';
   import { checkForUpdates, type UpdateCheckResult } from '$lib/api/updates';
   import { toastStore } from '$lib/stores/toastStore.svelte';
@@ -53,6 +54,37 @@
   function handlePollIntervalChange(event: Event) {
     const target = event.target as HTMLInputElement;
     settingsStore.setPollInterval(Number(target.value));
+  }
+
+  async function handleChooseWorkspace() {
+    try {
+      const picked = await openDialog({
+        directory: true,
+        multiple: false,
+        title: 'Choose LegacyKit workspace',
+        defaultPath: settingsStore.workspaceRoot ?? undefined,
+      });
+      if (picked && typeof picked === 'string') {
+        await settingsStore.setWorkspaceRoot(picked);
+        toastStore.success('Workspace updated', picked);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toastStore.error('Failed to update workspace', msg);
+    }
+  }
+
+  async function handleRevealWorkspace() {
+    try {
+      await settingsStore.revealWorkspace();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toastStore.error('Reveal failed', msg);
+    }
+  }
+
+  function handleRestartOnboarding() {
+    settingsStore.restartOnboarding();
   }
 </script>
 
@@ -151,6 +183,27 @@
   </div>
 
   <div class="settings-group">
+    <h3>Workspace</h3>
+    <div class="setting-row">
+      <div class="setting-info">
+        <span class="setting-title">Workspace folder</span>
+        <span class="setting-hint">{settingsStore.workspaceRoot ?? 'Not configured'}</span>
+      </div>
+      <button class="update-button" onclick={handleChooseWorkspace}>Change…</button>
+    </div>
+    <div class="setting-row">
+      <div class="setting-info">
+        <span class="setting-title">Actions</span>
+        <span class="setting-hint">Reveal workspace or run onboarding again</span>
+      </div>
+      <div class="button-group">
+        <button class="update-button" onclick={handleRevealWorkspace} disabled={!settingsStore.workspaceRoot}>Reveal</button>
+        <button class="update-button" onclick={handleRestartOnboarding}>Reset onboarding</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-group">
     <h3>Updates</h3>
     <div class="setting-row">
       <div class="setting-info">
@@ -225,11 +278,13 @@
     flex-direction: column;
     gap: 2px;
   }
-  .setting-info label {
+  .setting-info label,
+  .setting-title {
     font-size: 0.9rem;
     font-weight: 500;
     color: var(--color-text-primary);
     cursor: default;
+    display: inline-block;
   }
   .setting-hint {
     font-size: 0.75rem;
@@ -366,6 +421,11 @@
   }
   .update-button:disabled { opacity: 0.5; cursor: not-allowed; }
   .update-button:hover:not(:disabled) { border-color: var(--color-accent); color: var(--color-accent); }
+
+  .button-group {
+    display: flex;
+    gap: var(--spacing-xs);
+  }
 
   .update-result {
     margin-top: 8px;

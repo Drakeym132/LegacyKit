@@ -16,7 +16,7 @@ pub struct CommandRunResult {
 #[serde(rename_all = "camelCase")]
 pub struct ExportInfoRequest {
     pub udid: Option<String>,
-    pub output_dir: String,
+    pub output_dir: Option<String>,
     pub kind: ExportInfoKind,
     pub label: Option<String>,
 }

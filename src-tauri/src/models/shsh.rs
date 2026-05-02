@@ -11,7 +11,7 @@ pub struct SaveShshRequest {
     pub build_manifest_path: Option<String>,
     pub apnonce: Option<String>,
     pub generator: Option<String>,
-    pub output_dir: String,
+    pub output_dir: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,7 +27,7 @@ pub struct CydiaBlobRequest {
     pub device_type: String,
     pub device_ecid: String,
     pub build_ids: Vec<String>,
-    pub output_dir: String,
+    pub output_dir: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,7 +49,8 @@ pub struct CydiaBlobResult {
 #[serde(rename_all = "camelCase")]
 pub struct DumpOnboardBlobRequest {
     pub raw_dump_path: String,
-    pub output_path: String,
+    pub output_path: Option<String>,
+    pub device_ecid: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

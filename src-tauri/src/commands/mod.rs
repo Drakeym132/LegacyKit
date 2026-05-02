@@ -5,6 +5,7 @@ pub mod firmware;
 pub mod jailbreak;
 pub mod just_boot;
 pub mod restore;
+pub mod settings;
 pub mod shsh;
 pub mod trollstore;
 pub mod updates;

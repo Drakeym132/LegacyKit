@@ -9,7 +9,7 @@ export interface SaveShshRequest {
   buildManifestPath: string | null;
   apnonce: string | null;
   generator: string | null;
-  outputDir: string;
+  outputDir?: string | null;
 }
 
 export interface SaveShshResult {
@@ -21,7 +21,7 @@ export interface CydiaBlobRequest {
   deviceType: string;
   deviceEcid: string;
   buildIds: string[];
-  outputDir: string;
+  outputDir?: string | null;
 }
 
 export interface CydiaBlobAttempt {
@@ -37,7 +37,8 @@ export interface CydiaBlobResult {
 
 export interface DumpOnboardBlobRequest {
   rawDumpPath: string;
-  outputPath: string;
+  outputPath?: string | null;
+  deviceEcid?: string | null;
 }
 
 export interface DumpOnboardBlobResult {

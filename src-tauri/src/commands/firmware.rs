@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use crate::platform::resolve_binary_path;
+use crate::services::workspace;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io;
@@ -11,7 +12,9 @@ use tauri::AppHandle;
 pub struct IpswExtractRequest {
     pub ipsw_path: String,
     pub component_path: String,
-    pub output_path: String,
+    pub output_path: Option<String>,
+    pub device_identifier: Option<String>,
+    pub build_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,10 +44,7 @@ pub async fn extract_ipsw_component(
         return Err(AppError::Parse("Component path is required".to_string()));
     }
 
-    let output_path = PathBuf::from(request.output_path.trim());
-    if output_path.as_os_str().is_empty() {
-        return Err(AppError::Parse("Output path is required".to_string()));
-    }
+    let output_path = resolve_extract_output_path(&app, &request)?;
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -67,6 +67,37 @@ pub async fn extract_ipsw_component(
         output_path: output_path.to_string_lossy().to_string(),
         bytes,
     })
+}
+
+fn resolve_extract_output_path(
+    app: &AppHandle,
+    request: &IpswExtractRequest,
+) -> Result<PathBuf, AppError> {
+    let output_path = request
+        .output_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+
+    if let Some(path) = output_path {
+        return Ok(PathBuf::from(path));
+    }
+
+    let file_name = Path::new(request.component_path.trim())
+        .file_name()
+        .and_then(|n| n.to_str())
+        .filter(|n| !n.trim().is_empty())
+        .ok_or_else(|| {
+            AppError::Parse("Unable to infer output filename from component path".to_string())
+        })?;
+
+    let layout = workspace::get_layout(app)?;
+    let out_dir = layout.extracted_dir(
+        request.device_identifier.as_deref(),
+        request.build_id.as_deref(),
+    );
+    let out_dir = layout.ensure_dir(out_dir)?;
+    Ok(out_dir.join(file_name))
 }
 
 fn extract_zip_entry(

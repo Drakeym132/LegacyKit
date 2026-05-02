@@ -11,10 +11,10 @@
   import { runKloader } from '$lib/api/jailbreak';
   import { recordJustBoot } from '$lib/api/justBoot';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
+  import { settingsStore } from '$lib/stores/settingsStore.svelte';
   import { createWorkingController } from '$lib/utils/workingState.svelte';
 
   let ipswPath = $state('');
-  let outputDir = $state('');
   let bootArgs = $state('rd=md0 -v amfi_get_out_of_my_way=0x1 cs_enforcement_disable=1');
   let buildId = $state('');
   let iosVersion = $state('');
@@ -23,7 +23,6 @@
   let kernelIpswPath = $state('');
   let ramdiskIpswPath = $state('');
   let shshPath = $state('');
-  let sshBinariesDir = $state('');
   let ramdiskTargetSizeMb = $state(35);
 
   let extractedIbss = $state('');
@@ -37,11 +36,13 @@
   const work = createWorkingController();
 
   let productType = $derived(deviceStore.state.product_type);
+  let workspaceExtractedDir = $derived(settingsStore.workspacePaths?.extracted ?? '');
+  let workspaceSshBinariesDir = $derived(settingsStore.workspacePaths?.sshBinaries ?? '');
   let processorGen = $derived(inferProcessorGen(productType));
   let bitWidth = $derived<IbootBitWidth>(processorGen !== null && processorGen >= 7 ? 'bits64' : 'bits32');
   let mode = $derived(deviceStore.state.mode);
 
-  let canExtract = $derived(!work.isWorking && !!ipswPath && !!outputDir);
+  let canExtract = $derived(!work.isWorking && !!ipswPath && !!workspaceExtractedDir);
   let hasAnyExtracted = $derived(!!(extractedIbss || extractedIbec || extractedKernel || extractedRamdisk));
   let hasAnyPatched = $derived(!!(patchedIbss || patchedIbec || patchedKernel));
 
@@ -60,13 +61,13 @@
   }
 
   function joinOut(name: string): string {
-    const dir = outputDir.replace(/\/$/, '');
+    const dir = workspaceExtractedDir.replace(/\/$/, '');
     return `${dir}/${name}`;
   }
 
   async function handleExtractAll() {
-    if (!ipswPath || !outputDir) {
-      work.setError('Source IPSW and output directory are required.');
+    if (!ipswPath || !workspaceExtractedDir) {
+      work.setError('Source IPSW and workspace must be configured.');
       return;
     }
     await work.run('Extract all IPSW components', async () => {
@@ -169,8 +170,8 @@
   }
 
   async function handleModifyRamdisk() {
-    if (!extractedRamdisk || !sshBinariesDir) {
-      work.setError('Extracted ramdisk and SSH binaries directory are required.');
+    if (!extractedRamdisk || !workspaceSshBinariesDir) {
+      work.setError('Extracted ramdisk and workspace SSH binaries directory are required.');
       return;
     }
     await work.run('Modify ramdisk', async () => {
@@ -247,17 +248,16 @@
       <span>1</span>
       <h2>Sources & Components</h2>
     </div>
-    <p class="section-note">Provide the source IPSW, output directory, and the in-archive paths for each component to extract.</p>
+    <p class="section-note">Provide the source IPSW and in-archive paths. Outputs resolve into workspace directories automatically.</p>
 
     <div class="form-grid">
       <label>
         <span>Source IPSW</span>
         <input bind:value={ipswPath} placeholder="/path/to/firmware.ipsw" />
       </label>
-      <label>
-        <span>Output directory</span>
-        <input bind:value={outputDir} placeholder="/path/to/output" />
-      </label>
+      <div class="inline-note span-2">
+        Extracted output directory: <code>{workspaceExtractedDir || 'Workspace not configured'}</code>
+      </div>
       <label>
         <span>Build ID <em>(for Just Boot history)</em></span>
         <input bind:value={buildId} placeholder="e.g. 13G36" />
@@ -286,10 +286,9 @@
         <span>SHSH blob</span>
         <input bind:value={shshPath} placeholder="/path/to/blob.shsh" />
       </label>
-      <label>
-        <span>SSH binaries directory</span>
-        <input bind:value={sshBinariesDir} placeholder="/path/to/ssh/binaries" />
-      </label>
+      <div class="inline-note">
+        SSH binaries directory: <code>{workspaceSshBinariesDir || 'Workspace not configured'}</code>
+      </div>
       <label class="span-2">
         <span>Boot arguments</span>
         <input bind:value={bootArgs} placeholder="rd=md0 -v amfi_get_out_of_my_way=0x1" />
@@ -370,7 +369,7 @@
     <p class="section-note">Resize the ramdisk and inject SSH binaries before booting.</p>
 
     <div class="actions">
-      <button class="secondary" onclick={handleModifyRamdisk} disabled={work.isWorking || !extractedRamdisk || !sshBinariesDir}>
+      <button class="secondary" onclick={handleModifyRamdisk} disabled={work.isWorking || !extractedRamdisk || !workspaceSshBinariesDir}>
         Modify ramdisk
       </button>
     </div>

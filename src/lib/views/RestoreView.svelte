@@ -14,6 +14,7 @@
     type RestoreRunRequest,
     type RestoreTool,
   } from '$lib/api/restore';
+  import IpswDownloaderPanel from '$lib/components/restore/IpswDownloaderPanel.svelte';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
 
@@ -26,12 +27,10 @@
 
   let ipswPath = $state('');
   let downloadUrl = $state('');
-  let downloadDir = $state('');
   let downloadFileName = $state('');
   let expectedSha1 = $state('');
   let verifyResult = $state<IpswVerifyResult | null>(null);
 
-  let shshPath = $state('');
   let selectedTool = $state<RestoreTool>('ideviceRestore');
   let erase = $state(true);
   let update = $state(false);
@@ -43,7 +42,6 @@
   let latestBaseband = $state(false);
   let preview = $state<RestoreCommandPreview | null>(null);
 
-  let prepOutputDir = $state('');
   let isPreparing = $state(false);
   let prepResult = $state<IpswPrepareResult | null>(null);
 
@@ -53,7 +51,7 @@
   let commandRequest = $derived(buildCommandRequest());
   let canVerify = $derived(ipswPath.trim().endsWith('.ipsw') && !isWorking && !isPreparing);
   let canPrep = $derived(
-    needsPrepStep && ipswPath.trim().endsWith('.ipsw') && prepOutputDir.trim() !== '' && !isWorking && !isPreparing
+    needsPrepStep && ipswPath.trim().endsWith('.ipsw') && !isWorking && !isPreparing
   );
   let canPreview = $derived(!!effectiveIpswPath.trim() && !isWorking && !isPreparing);
   let canRun = $derived(!!preview && !isWorking && !isPreparing);
@@ -112,8 +110,11 @@
     try {
       const result = await downloadIpsw({
         url: downloadUrl,
-        outputDir: downloadDir,
+        outputDir: '',
+        deviceIdentifier: restoreOptions?.productType ?? deviceStore.state.product_type ?? null,
         fileName: downloadFileName || null,
+        expectedSha1: expectedSha1 || null,
+        downloadId: null,
       });
       ipswPath = result.path;
       logStore.append(`Downloaded IPSW: ${result.path}`, 'info');
@@ -180,7 +181,7 @@
     return {
       tool: selectedTool,
       ipswPath: effectiveIpswPath,
-      shshPath: shshPath || null,
+      shshPath: null,
       erase,
       update,
       usePwndfu,
@@ -211,8 +212,9 @@
     try {
       prepResult = await prepareIpsw({
         ipswPath,
-        outputDir: prepOutputDir,
-        shshPath: selectedOption?.requiresBlobs ? (shshPath || null) : null,
+        outputDir: '',
+        deviceIdentifier: restoreOptions?.productType ?? device.product_type ?? null,
+        shshPath: null,
         deviceEcid: device.ecid || null,
       });
       logStore.append(`Custom IPSW ready: ${prepResult.outputPath}`, 'info');
@@ -222,6 +224,13 @@
     } finally {
       isPreparing = false;
     }
+  }
+
+  function handleUseDownloadedIpsw(path: string, sha1: string | null) {
+    ipswPath = path;
+    if (sha1) expectedSha1 = sha1;
+    verifyResult = null;
+    preview = null;
   }
 </script>
 
@@ -327,27 +336,31 @@
         </div>
       {/if}
 
-      <div class="download-box">
-        <div class="form-grid">
-          <label>
-            <span>Download URL</span>
-            <input bind:value={downloadUrl} placeholder="https://...Restore.ipsw" />
-          </label>
-          <label>
-            <span>Output Directory</span>
-            <input bind:value={downloadDir} placeholder="/path/to/downloads" />
-          </label>
-          <label>
-            <span>File Name</span>
-            <input bind:value={downloadFileName} placeholder="Optional" />
-          </label>
+      {#if selectedOption?.kind === 'ipswDownloader'}
+        <IpswDownloaderPanel
+          deviceIdentifier={restoreOptions.productType}
+          onUseIpsw={handleUseDownloadedIpsw}
+        />
+      {:else}
+        <div class="download-box">
+          <p class="workspace-destination-note">Download destination: workspace <code>ipsw/&lt;device&gt;</code></p>
+          <div class="form-grid">
+            <label>
+              <span>Download URL</span>
+              <input bind:value={downloadUrl} placeholder="https://...Restore.ipsw" />
+            </label>
+            <label>
+              <span>File Name</span>
+              <input bind:value={downloadFileName} placeholder="Optional" />
+            </label>
+          </div>
+          <div class="actions">
+            <button class="secondary" onclick={handleDownload} disabled={isWorking || !downloadUrl}>
+              Download with aria2c
+            </button>
+          </div>
         </div>
-        <div class="actions">
-          <button class="secondary" onclick={handleDownload} disabled={isWorking || !downloadUrl || !downloadDir}>
-            Download with aria2c
-          </button>
-        </div>
-      </div>
+      {/if}
     </section>
 
     {#if needsPrepStep}
@@ -360,17 +373,9 @@
           powdersn0w will patch the source IPSW and write a custom IPSW to the output directory.
           The custom IPSW is then used automatically in the restore step.
         </p>
+        <p class="workspace-destination-note">Custom IPSW destination: workspace <code>ipsw-custom/&lt;device&gt;</code></p>
         <div class="form-grid">
-          <label>
-            <span>Output Directory</span>
-            <input bind:value={prepOutputDir} placeholder="/path/to/output" />
-          </label>
-          {#if selectedOption?.requiresBlobs}
-            <label>
-              <span>SHSH Blob Path</span>
-              <input bind:value={shshPath} placeholder="Required for blob-based restore" />
-            </label>
-          {/if}
+          <div class="inline-note">SHSH and output paths are resolved from workspace layout.</div>
         </div>
         <div class="actions">
           <button class="secondary" onclick={handlePrepareIpsw} disabled={!canPrep}>
@@ -399,10 +404,6 @@
             <option value="ideviceRestore">idevicerestore</option>
             <option value="futureRestore">futurerestore</option>
           </select>
-        </label>
-        <label>
-          <span>Target SHSH Path</span>
-          <input bind:value={shshPath} placeholder="Required for futurerestore" />
         </label>
       </div>
 
@@ -598,7 +599,7 @@
     font-weight: 600;
   }
 
-  input,
+  input:not([type='checkbox']):not([type='radio']),
   select {
     width: 100%;
     border: 1px solid var(--color-border);
@@ -606,8 +607,7 @@
     background: var(--color-bg-primary);
     color: var(--color-text-primary);
     font: inherit;
-    font-size: 0.85rem;
-    padding: 8px 10px;
+    /* height + padding inherited from global :where() rules in app.css */
   }
 
   .download-box {
@@ -616,21 +616,48 @@
     padding-top: var(--spacing-md);
   }
 
+  .workspace-destination-note,
+  .inline-note {
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+    margin: 0 0 var(--spacing-md);
+  }
+
+  .workspace-destination-note code {
+    color: var(--color-text-primary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.76rem;
+  }
+
   .toggle-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* Auto-fit so labels never truncate; on a 1100px panel this lays out
+       as 3 columns, on narrower viewports it gracefully steps to 2 / 1. */
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
   }
 
   .toggle-grid label {
-    align-items: center;
+    display: flex;
     flex-direction: row;
+    align-items: center;
     gap: var(--spacing-sm);
-    min-height: 32px;
+    min-height: var(--control-h);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     background: var(--color-bg-primary);
-    padding: 0 var(--spacing-sm);
+    color: var(--color-text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 6px var(--spacing-sm);
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle-grid label:hover { border-color: var(--color-accent); }
+  .toggle-grid label:has(input:disabled) {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 
   .actions {

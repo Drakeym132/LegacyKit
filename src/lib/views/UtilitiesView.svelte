@@ -26,6 +26,7 @@
     type TrollStorePrepareResult,
   } from '$lib/api/trollstore';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
+  import { settingsStore } from '$lib/stores/settingsStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
   import { createWorkingController } from '$lib/utils/workingState.svelte';
 
@@ -39,9 +40,9 @@
   let device = $derived(deviceStore.state);
   const work = createWorkingController();
 
-  let exportDir = $state('');
   let exportLabel = $state('');
   let lastExportPath = $state<string | null>(null);
+  let backupsRoot = $derived(settingsStore.workspacePaths?.backups ?? null);
 
   let irecoveryRaw = $state('setenv auto-boot true\nsaveenv');
   let rebootAfter = $state(true);
@@ -107,14 +108,10 @@
   }
 
   async function handleExport(kind: ExportInfoKind) {
-    if (!exportDir.trim()) {
-      work.setError('Pick an output directory first.');
-      return;
-    }
     const result = await work.run(`Export ${kind}`, () =>
       exportDeviceInfo({
         udid: udid(),
-        outputDir: exportDir.trim(),
+        outputDir: null,
         kind,
         label: exportLabel.trim() || null,
       }),
@@ -407,13 +404,12 @@
     <section class="panel">
       <div class="section-title"><span>1</span><h2>Export device diagnostics</h2></div>
       <p class="panel-note">
-        Saves a timestamped <code>.txt</code> in the chosen directory. Useful for bug
+        Saves a timestamped <code>.txt</code> in the workspace backups directory. Useful for bug
         reports.
       </p>
-      <label class="field">
-        <span>Output directory (absolute)</span>
-        <input bind:value={exportDir} placeholder="/Users/you/legacykit/exports" />
-      </label>
+      <p class="footer-note">
+        Destination → <code class="wrap">{backupsRoot ?? 'Workspace not configured'}</code>
+      </p>
       <label class="field">
         <span>Optional label prefix</span>
         <input bind:value={exportLabel} placeholder="device-info" />
@@ -672,10 +668,12 @@
   .checkbox {
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: var(--spacing-sm);
     color: var(--color-text-primary);
     font-size: 0.85rem;
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    cursor: pointer;
+    user-select: none;
   }
 
   .row {
@@ -695,7 +693,7 @@
 
   .action-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: var(--spacing-sm);
   }
   .action-grid button {
@@ -703,7 +701,9 @@
     flex-direction: column;
     gap: 2px;
     align-items: flex-start;
-    padding: 12px;
+    justify-content: center; /* vertically centre regardless of subtitle */
+    min-height: 56px;        /* keeps subtitled / non-subtitled rows level */
+    padding: 10px var(--spacing-md);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     background: var(--color-bg-primary);
@@ -712,14 +712,16 @@
     font-weight: 600;
     cursor: pointer;
     text-align: left;
+    line-height: 1.3;
   }
   .action-grid button:hover:not(:disabled) {
     border-color: var(--color-accent);
   }
   .action-grid button small {
     color: var(--color-text-secondary);
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     font-weight: 400;
+    line-height: 1.3;
   }
   .action-grid button.danger {
     border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));

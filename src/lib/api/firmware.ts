@@ -3,7 +3,9 @@ import { invoke } from '@tauri-apps/api/core';
 export interface IpswExtractRequest {
   ipswPath: string;
   componentPath: string;
-  outputPath: string;
+  outputPath?: string | null;
+  deviceIdentifier?: string | null;
+  buildId?: string | null;
 }
 
 export interface IpswExtractResult {

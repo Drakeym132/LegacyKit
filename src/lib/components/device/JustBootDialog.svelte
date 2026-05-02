@@ -1,12 +1,11 @@
 <script lang="ts">
   import { runKloader } from '../../api/jailbreak';
-  import { 
+  import {
     listJustBootHistory, 
     recordJustBoot, 
     forgetJustBoot, 
     prepareAndJustBoot,
     type JustBootEntry,
-    type JustBootEntryInput,
     type PrepareAndJustBootRequest
   } from '../../api/justBoot';
   import { deviceStore } from '../../stores/deviceStore.svelte';
@@ -32,8 +31,6 @@
   let iosVersion = $state('');
   let includeIbec = $state(true);
   let bootArgs = $state('');
-  let manualIbssPath = $state('');
-  let manualIbecPath = $state('');
   let showAdvanced = $state(false);
 
   // Device state
@@ -220,46 +217,6 @@
     }
     if (!isPwnDfu) {
       errorMessage = 'Device must be in pwnDFU mode before booting';
-      return;
-    }
-
-    // Check if manual paths are provided
-    if (manualIbssPath.trim() && manualIbecPath.trim()) {
-      isWorking = true;
-      errorMessage = null;
-      const label = 'Booting with manual paths';
-      logStore.append(`${label}...`, 'info');
-      
-      try {
-        await runKloader({ 
-          ibssPath: manualIbssPath.trim(), 
-          ibecPath: manualIbecPath.trim() 
-        });
-        
-        // Record the boot
-        await recordJustBoot({
-          ecid: deviceEcid || '',
-          productType: deviceProductType || '',
-          deviceName: deviceState.name,
-          buildId: buildId.trim(),
-          iosVersion: iosVersion.trim() || null,
-          bootArgs: bootArgs.trim() || null,
-          repackedIbssPath: manualIbssPath.trim(),
-          repackedIbecPath: manualIbecPath.trim(),
-          sourceIpswPath: ipswPath.trim()
-        });
-
-        logStore.append(`${label} ok`, 'info');
-        toastStore.success('Boot successful', 'Device should now be booting');
-        onClose();
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        errorMessage = msg;
-        logStore.append(`${label} failed: ${msg}`, 'stderr');
-        toastStore.error('Boot failed', msg);
-      } finally {
-        isWorking = false;
-      }
       return;
     }
 
@@ -539,17 +496,9 @@
               <span>Custom boot-args</span>
               <input bind:value={bootArgs} placeholder="pio-error=0 -v" disabled={isWorking} />
             </label>
-
-            <div class="manual-paths">
-              <label class="field">
-                <span>Patched iBSS path (manual)</span>
-                <input bind:value={manualIbssPath} placeholder="/path/to/iBSS.repacked" disabled={isWorking} />
-              </label>
-              <label class="field">
-                <span>Patched iBEC path (manual)</span>
-                <input bind:value={manualIbecPath} placeholder="/path/to/iBEC.repacked" disabled={isWorking} />
-              </label>
-            </div>
+            <p class="advanced-note">
+              Repacked bootchain files are resolved and cached automatically under the configured workspace.
+            </p>
           </details>
 
           {#if errorMessage}
@@ -562,7 +511,7 @@
               onclick={handlePrepareAndBoot}
               disabled={isWorking || !isPwnDfu || !ipswPath.trim() || !buildId.trim()}
             >
-              {isWorking ? 'Working…' : manualIbssPath.trim() && manualIbecPath.trim() ? 'Boot' : 'Prepare & Boot'}
+              {isWorking ? 'Working…' : 'Prepare & Boot'}
             </button>
           </div>
         </div>
@@ -852,11 +801,11 @@
     font-size: 0.8125rem;
   }
 
-  .manual-paths {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    padding-left: var(--spacing-sm);
+  .advanced-note {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+    line-height: 1.45;
   }
 
   .error {

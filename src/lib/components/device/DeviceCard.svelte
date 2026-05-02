@@ -19,7 +19,7 @@
   let cpid = $derived(deviceStore.state.cpid || '');
 </script>
 
-<div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-3 mb-6 shadow-sm transition-all duration-200 {isConnected ? 'ring-1 ring-[var(--color-accent)] ring-opacity-30' : ''}">
+<div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius-lg)] p-3 shadow-sm transition-all duration-200 {isConnected ? 'ring-1 ring-[var(--color-accent)] ring-opacity-30' : ''}">
   <div class="flex items-center gap-2">
     <div class="text-2xl w-10 h-10 flex items-center justify-center bg-[var(--color-bg-secondary)] rounded-[var(--radius-sm)]">📱</div>
     <div class="flex-1 min-w-0">

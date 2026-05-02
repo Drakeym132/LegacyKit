@@ -8,6 +8,7 @@
     type SavedBlob,
   } from '$lib/api/shsh';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
+  import { settingsStore } from '$lib/stores/settingsStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
   import { createWorkingController } from '$lib/utils/workingState.svelte';
 
@@ -17,7 +18,6 @@
 
   let device = $derived(deviceStore.state);
 
-  let savedDir = $state('');
   let saveDeviceType = $state('');
   let saveEcid = $state('');
   let saveBoard = $state('');
@@ -31,10 +31,16 @@
   let cydiaResults = $state<CydiaBlobAttempt[]>([]);
 
   let dumpRawPath = $state('');
-  let dumpOutputPath = $state('');
 
   let blobs = $state<SavedBlob[]>([]);
   const work = createWorkingController();
+  let workspaceShshRoot = $derived(settingsStore.workspacePaths?.shsh ?? null);
+  let libraryDirectory = $derived.by(() => {
+    const root = workspaceShshRoot;
+    const ecid = saveEcid.trim() || device.ecid?.trim() || '';
+    if (!root || !ecid) return null;
+    return `${root.replace(/[\\/]+$/, '')}/${ecid}`;
+  });
 
   $effect(() => {
     if (device.product_type && !saveDeviceType) saveDeviceType = device.product_type;
@@ -48,10 +54,6 @@
   }
 
   async function handleSave() {
-    if (!savedDir.trim()) {
-      work.setError('Output directory is required.');
-      return;
-    }
     const result = await work.run('Save SHSH (tsschecker)', () =>
       saveShshBlob({
         deviceType: saveDeviceType.trim(),
@@ -62,7 +64,7 @@
         buildManifestPath: nullable(saveManifest),
         apnonce: nullable(saveApnonce),
         generator: nullable(saveGenerator),
-        outputDir: savedDir.trim(),
+        outputDir: null,
       }),
     );
     if (result) {
@@ -72,10 +74,6 @@
   }
 
   async function handleCydia() {
-    if (!savedDir.trim()) {
-      work.setError('Output directory is required.');
-      return;
-    }
     const buildIds = cydiaBuilds.split(/[\s,]+/).map((b) => b.trim()).filter(Boolean);
     if (buildIds.length === 0) {
       work.setError('Provide at least one build ID (space- or comma-separated).');
@@ -86,7 +84,7 @@
         deviceType: saveDeviceType.trim(),
         deviceEcid: saveEcid.trim(),
         buildIds,
-        outputDir: savedDir.trim(),
+        outputDir: null,
       }),
     );
     if (result) {
@@ -104,7 +102,8 @@
     const result = await work.run('Convert raw dump to SHSH', () =>
       dumpOnboardBlob({
         rawDumpPath: dumpRawPath.trim(),
-        outputPath: dumpOutputPath.trim(),
+        outputPath: null,
+        deviceEcid: nullable(saveEcid) ?? device.ecid ?? null,
       }),
     );
     if (result) {
@@ -114,12 +113,12 @@
   }
 
   async function refreshLibrary() {
-    if (!savedDir.trim()) {
+    if (!libraryDirectory) {
       blobs = [];
       return;
     }
     const result = await work.run('List saved blobs', () =>
-      listSavedBlobs({ directory: savedDir.trim() }),
+      listSavedBlobs({ directory: libraryDirectory }),
     );
     if (result) {
       blobs = result.blobs;
@@ -166,17 +165,12 @@
   {/if}
 
   <section class="panel">
-    <label class="field">
+    <div class="field">
       <span>Saved blobs directory</span>
-      <input
-        bind:value={savedDir}
-        placeholder="/Users/you/.legacykit/saved/shsh"
-        onblur={refreshLibrary}
-      />
-    </label>
+      <code class="path-preview">{libraryDirectory ?? 'Workspace + ECID required'}</code>
+    </div>
     <p class="panel-note">
-      All commands write to this directory. The library tab lists everything LegacyKit can
-      find here.
+      SHSH save/fetch/dump now use workspace defaults. Library auto-loads <code>shsh/&lt;ECID&gt;</code>.
     </p>
   </section>
 
@@ -297,13 +291,7 @@
         <span>Raw dump path</span>
         <input bind:value={dumpRawPath} placeholder="/path/to/dump.raw" />
       </label>
-      <label class="field">
-        <span>Output blob path</span>
-        <input
-          bind:value={dumpOutputPath}
-          placeholder="/path/to/saved/shsh/<ecid>-<device>-<date>.shsh2"
-        />
-      </label>
+      <p class="panel-note">Output path is auto-generated in workspace <code>shsh/&lt;ECID&gt;</code>.</p>
 
       <div class="actions">
         <button class="primary" onclick={handleDump} disabled={work.isWorking}>
@@ -324,7 +312,7 @@
         </button>
       </div>
       {#if blobs.length === 0}
-        <div class="empty">No blobs found. Save one first or check the directory path.</div>
+        <div class="empty">No blobs found. Save one first or ensure workspace + ECID are set.</div>
       {:else}
         <table class="results">
           <thead>

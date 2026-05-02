@@ -124,7 +124,7 @@
     </nav>
 
     {#if navigationStore.currentView !== 'home'}
-      <div class="mt-3" transition:fly={{ y: 12, duration: 220 }}>
+      <div class="mt-auto pt-6" transition:fly={{ y: 12, duration: 220 }}>
         <DeviceCard />
       </div>
     {/if}

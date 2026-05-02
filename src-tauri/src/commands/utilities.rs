@@ -6,10 +6,11 @@ use crate::models::utilities::{
     SyslogStartRequest, SyslogStatusResult, UdidRequest,
 };
 use crate::platform::resolve_binary_path;
+use crate::services::workspace;
 use crate::tools::util::{nullable, timestamp_dir_now};
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
@@ -162,11 +163,7 @@ pub async fn export_device_info(
     app: AppHandle,
     request: ExportInfoRequest,
 ) -> Result<ExportInfoResult, AppError> {
-    let output_dir = request.output_dir.trim();
-    if output_dir.is_empty() {
-        return Err(AppError::Parse("Output directory is required".into()));
-    }
-    fs::create_dir_all(output_dir)?;
+    let output_dir = resolve_export_output_dir(&app, request.output_dir.as_deref(), request.udid.as_deref())?;
 
     let (binary_name, base_args, label_default) = match request.kind {
         ExportInfoKind::DeviceInfo => ("ideviceinfo", Vec::<String>::new(), "device-info"),
@@ -198,7 +195,7 @@ pub async fn export_device_info(
         .filter(|s| !s.is_empty())
         .unwrap_or(label_default);
     let filename = format!("{label}-{stamp}.txt");
-    let out_path = Path::new(output_dir).join(&filename);
+    let out_path = output_dir.join(&filename);
 
     crate::tools::runner::emit_log(
         &app,
@@ -231,6 +228,24 @@ pub async fn export_device_info(
         path: out_path.to_string_lossy().to_string(),
         bytes,
     })
+}
+
+fn resolve_export_output_dir(
+    app: &AppHandle,
+    requested: Option<&str>,
+    udid: Option<&str>,
+) -> Result<PathBuf, AppError> {
+    let requested = requested.map(str::trim).filter(|s| !s.is_empty());
+    if let Some(path) = requested {
+        let pb = PathBuf::from(path);
+        fs::create_dir_all(&pb)?;
+        return Ok(pb);
+    }
+
+    let layout = workspace::get_layout(app)?;
+    let mut out = layout.backups_dir(udid);
+    out.push(timestamp_dir_now());
+    layout.ensure_dir(out)
 }
 
 #[tauri::command]

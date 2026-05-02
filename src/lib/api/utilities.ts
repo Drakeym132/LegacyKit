@@ -13,7 +13,7 @@ export type ExportInfoKind = 'device-info' | 'battery-info' | 'diagnostics-all';
 
 export interface ExportInfoRequest {
   udid: string | null;
-  outputDir: string;
+  outputDir?: string | null;
   kind: ExportInfoKind;
   label?: string | null;
 }

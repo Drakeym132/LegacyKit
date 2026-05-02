@@ -5,9 +5,10 @@ use crate::models::shsh::{
 };
 use crate::platform::resolve_binary_path;
 use crate::services::shsh_store;
+use crate::services::workspace;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tauri::AppHandle;
 
@@ -21,8 +22,7 @@ pub async fn save_shsh_blob(
     let device_type = require_field(&request.device_type, "Device type")?;
     let device_ecid = require_field(&request.device_ecid, "Device ECID")?;
     let ios_version = require_field(&request.ios_version, "iOS version")?;
-    let output_dir = require_field(&request.output_dir, "Output directory")?;
-    fs::create_dir_all(&output_dir)?;
+    let output_dir = resolve_blob_output_dir(&app, request.output_dir.as_deref(), &device_ecid)?;
 
     let manifest_path = request
         .build_manifest_path
@@ -68,7 +68,7 @@ pub async fn save_shsh_blob(
         "-s".to_string(),
         "-o".to_string(),
         "--save-path".to_string(),
-        output_dir.clone(),
+        output_dir.to_string_lossy().to_string(),
     ];
 
     if let Some(board) = board_config {
@@ -103,9 +103,9 @@ pub async fn save_shsh_blob(
         ),
     );
 
-    let blobs_before = collect_blob_paths(Path::new(&output_dir));
+    let blobs_before = collect_blob_paths(&output_dir);
     crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
-    let blobs_after = collect_blob_paths(Path::new(&output_dir));
+    let blobs_after = collect_blob_paths(&output_dir);
 
     let new_blobs: Vec<String> = blobs_after
         .into_iter()
@@ -137,8 +137,7 @@ pub async fn fetch_cydia_blobs(
 ) -> Result<CydiaBlobResult, AppError> {
     let device_type = require_field(&request.device_type, "Device type")?;
     let device_ecid = require_field(&request.device_ecid, "Device ECID")?;
-    let output_dir = require_field(&request.output_dir, "Output directory")?;
-    fs::create_dir_all(&output_dir)?;
+    let output_dir = resolve_blob_output_dir(&app, request.output_dir.as_deref(), &device_ecid)?;
 
     if request.build_ids.is_empty() {
         return Err(AppError::Parse(
@@ -169,19 +168,19 @@ pub async fn fetch_cydia_blobs(
             "--buildid".to_string(),
             build.to_string(),
             "--save-path".to_string(),
-            output_dir.clone(),
+            output_dir.to_string_lossy().to_string(),
         ];
 
-        let blobs_before = collect_blob_paths(Path::new(&output_dir));
+        let blobs_before = collect_blob_paths(&output_dir);
         match run_process_capturing(&binary, &args) {
             Ok(_) => {
-                let blobs_after = collect_blob_paths(Path::new(&output_dir));
+                let blobs_after = collect_blob_paths(&output_dir);
                 let new_blob = blobs_after
                     .into_iter()
                     .find(|p| !blobs_before.contains(p));
                 match new_blob {
                     Some(found) => {
-                        let dest = Path::new(&output_dir)
+                        let dest = output_dir
                             .join(format!("{device_ecid}-{device_type}-{build}.shsh"));
                         let final_path = if Path::new(&found) == dest {
                             found
@@ -252,22 +251,16 @@ pub async fn dump_onboard_blob(
         )));
     }
 
-    let output_path = request.output_path.trim();
-    if output_path.is_empty() {
-        return Err(AppError::Parse(
-            "Output blob path is required".to_string(),
-        ));
-    }
-    if let Some(parent) = Path::new(output_path).parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)?;
-        }
-    }
+    let output_path = resolve_dump_output_path(
+        &app,
+        request.output_path.as_deref(),
+        request.device_ecid.as_deref(),
+    )?;
 
     let args = vec![
         "--convert".to_string(),
         "-s".to_string(),
-        output_path.to_string(),
+        output_path.to_string_lossy().to_string(),
         raw_path.to_string(),
     ];
 
@@ -279,10 +272,10 @@ pub async fn dump_onboard_blob(
     );
     crate::tools::runner::run_streaming(&app, binary, &args)?;
 
-    let metadata = fs::metadata(output_path)
+    let metadata = fs::metadata(&output_path)
         .map_err(|e| AppError::CommandFailed(format!("Output blob not created: {e}")))?;
     if metadata.len() == 0 {
-        let _ = fs::remove_file(output_path);
+        let _ = fs::remove_file(&output_path);
         return Err(AppError::CommandFailed(
             "img4tool produced an empty SHSH file".to_string(),
         ));
@@ -291,11 +284,11 @@ pub async fn dump_onboard_blob(
     crate::tools::runner::emit_log(
         &app,
         "info",
-        &format!("Onboard blob written to {output_path}"),
+        &format!("Onboard blob written to {}", output_path.to_string_lossy()),
     );
 
     Ok(DumpOnboardBlobResult {
-        blob_path: output_path.to_string(),
+        blob_path: output_path.to_string_lossy().to_string(),
         args,
     })
 }
@@ -316,6 +309,50 @@ fn require_field(value: &str, label: &str) -> Result<String, AppError> {
         return Err(AppError::Parse(format!("{label} is required")));
     }
     Ok(trimmed.to_string())
+}
+
+fn resolve_blob_output_dir(
+    app: &AppHandle,
+    requested: Option<&str>,
+    device_ecid: &str,
+) -> Result<PathBuf, AppError> {
+    let requested = requested.map(str::trim).filter(|s| !s.is_empty());
+    if let Some(path) = requested {
+        let out = PathBuf::from(path);
+        fs::create_dir_all(&out)?;
+        return Ok(out);
+    }
+
+    let layout = workspace::get_layout(app)?;
+    let out = layout.shsh_dir(Some(device_ecid));
+    layout.ensure_dir(out)
+}
+
+fn resolve_dump_output_path(
+    app: &AppHandle,
+    requested: Option<&str>,
+    device_ecid: Option<&str>,
+) -> Result<PathBuf, AppError> {
+    let requested = requested.map(str::trim).filter(|s| !s.is_empty());
+    if let Some(path) = requested {
+        let pb = PathBuf::from(path);
+        if let Some(parent) = pb.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+        return Ok(pb);
+    }
+
+    let layout = workspace::get_layout(app)?;
+    let dir = layout.shsh_dir(device_ecid);
+    let ensured = layout.ensure_dir(dir)?;
+    let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+    let ecid = device_ecid
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("unknown-ecid");
+    Ok(ensured.join(format!("{ecid}-{stamp}.shsh2")))
 }
 
 fn collect_blob_paths(dir: &Path) -> Vec<String> {

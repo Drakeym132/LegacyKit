@@ -302,16 +302,22 @@
 
   .row {
     display: flex;
-    gap: var(--spacing-sm);
-    align-items: end;
+    gap: var(--spacing-md);
+    align-items: flex-end;
     margin-bottom: var(--spacing-md);
   }
+  .row .field.inline { min-width: 0; }
 
   .actions {
     display: flex;
     gap: var(--spacing-sm);
     justify-content: flex-end;
   }
+  /* Prevent buttons from sitting on top of textareas/inputs in single-column
+     layouts. Inside .row the previous sibling is .field so this still applies,
+     but the row's `align-items: flex-end` keeps the visual baseline correct. */
+  .field + .actions { margin-top: var(--spacing-md); }
+  .row .field + .actions { margin-top: 0; }
 
   button.primary, button.secondary, button.danger {
     border-radius: var(--radius-sm);
