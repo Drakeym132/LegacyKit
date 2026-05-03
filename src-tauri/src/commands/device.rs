@@ -15,7 +15,7 @@ pub async fn detect_device(app: tauri::AppHandle) -> Result<DeviceInfo, AppError
             }
         }
     }
-    
+
     // Fallback: try irecovery for Recovery/DFU mode
     if let Ok(irecovery_path) = resolve_binary_path(&app, "irecovery") {
         if let Ok(output) = Command::new(&irecovery_path).arg("-q").output() {
@@ -25,7 +25,7 @@ pub async fn detect_device(app: tauri::AppHandle) -> Result<DeviceInfo, AppError
             }
         }
     }
-    
+
     // No device found
     Ok(DeviceInfo::default())
 }

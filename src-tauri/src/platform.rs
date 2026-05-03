@@ -76,7 +76,10 @@ mod tests {
     fn candidates_x86_64_uses_x86_64_subdir() {
         let base = PathBuf::from("/tmp/binaries/linux");
         let v = build_candidate_paths(&base, "x86_64", "ideviceinfo");
-        assert_eq!(v[0], PathBuf::from("/tmp/binaries/linux/x86_64/ideviceinfo"));
+        assert_eq!(
+            v[0],
+            PathBuf::from("/tmp/binaries/linux/x86_64/ideviceinfo")
+        );
         assert_eq!(v[1], PathBuf::from("/tmp/binaries/linux/ideviceinfo"));
     }
 

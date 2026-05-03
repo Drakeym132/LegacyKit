@@ -6,7 +6,11 @@
 pub fn infer_processor_gen(product_type: &str) -> Option<u8> {
     let p = product_type;
 
-    if p.starts_with("iPhone1,") || p.starts_with("iPhone2,") || p.starts_with("iPod1,") || p.starts_with("iPod2,") {
+    if p.starts_with("iPhone1,")
+        || p.starts_with("iPhone2,")
+        || p.starts_with("iPod1,")
+        || p.starts_with("iPod2,")
+    {
         return Some(1);
     }
     if p == "iPod3,1" {

@@ -21,7 +21,11 @@ pub fn prepare_cached_bootchain(
     let cached_ibss = cache_dir.join("iBSS.repacked");
     let cached_ibec = cache_dir.join("iBEC.repacked");
 
-    if cache_is_reusable(ipsw_path, &cached_ibss, include_ibec.then_some(&cached_ibec))? {
+    if cache_is_reusable(
+        ipsw_path,
+        &cached_ibss,
+        include_ibec.then_some(&cached_ibec),
+    )? {
         crate::tools::runner::emit_log(
             app,
             "info",
@@ -49,11 +53,9 @@ pub fn prepare_cached_bootchain(
     let ibss_component = find_component_path(ipsw_path, "iBSS")
         .ok_or_else(|| AppError::Parse("Could not locate iBSS component in IPSW".to_string()))?;
     let ibec_component = if include_ibec {
-        Some(
-            find_component_path(ipsw_path, "iBEC").ok_or_else(|| {
-                AppError::Parse("Could not locate iBEC component in IPSW".to_string())
-            })?,
-        )
+        Some(find_component_path(ipsw_path, "iBEC").ok_or_else(|| {
+            AppError::Parse("Could not locate iBEC component in IPSW".to_string())
+        })?)
     } else {
         None
     };
@@ -117,12 +119,20 @@ pub fn run_kloader_with_paths(
     crate::tools::runner::emit_log(
         app,
         "info",
-        &format!("Booting patched components with kloader: {}", args.join(" ")),
+        &format!(
+            "Booting patched components with kloader: {}",
+            args.join(" ")
+        ),
     );
     crate::tools::runner::run_streaming(app, binary, &args)
 }
 
-fn patch_iboot32(app: &AppHandle, input: &Path, output: &Path, boot_args: &str) -> Result<(), AppError> {
+fn patch_iboot32(
+    app: &AppHandle,
+    input: &Path,
+    output: &Path,
+    boot_args: &str,
+) -> Result<(), AppError> {
     let binary = resolve_binary_path(app, "iBoot32Patcher").map_err(AppError::CommandFailed)?;
     let args = vec![
         input.to_string_lossy().to_string(),
@@ -169,7 +179,11 @@ fn repack_img3(app: &AppHandle, input: &Path, output: &Path) -> Result<(), AppEr
     crate::tools::runner::run_streaming(app, binary, &args)
 }
 
-fn extract_zip_entry(archive_path: &str, entry_name: &str, output_path: &Path) -> Result<(), AppError> {
+fn extract_zip_entry(
+    archive_path: &str,
+    entry_name: &str,
+    output_path: &Path,
+) -> Result<(), AppError> {
     let file = File::open(archive_path)?;
     let mut archive = zip::ZipArchive::new(file)
         .map_err(|e| AppError::CommandFailed(format!("Failed to open IPSW: {e}")))?;

@@ -54,7 +54,10 @@ mod tests {
     fn args_without_shsh_or_ecid() {
         let out = Path::new("/tmp/out/custom.ipsw");
         let args = build_powdersn0w_args("/tmp/in.ipsw", out, None, None);
-        assert_eq!(args, vec!["-i", "/tmp/in.ipsw", "-o", "/tmp/out/custom.ipsw"]);
+        assert_eq!(
+            args,
+            vec!["-i", "/tmp/in.ipsw", "-o", "/tmp/out/custom.ipsw"]
+        );
     }
 
     #[test]

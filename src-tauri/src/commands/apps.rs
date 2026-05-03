@@ -79,7 +79,11 @@ pub async fn install_ipa(
         installed.push(trimmed);
     }
 
-    crate::tools::runner::emit_log(&app, "info", &format!("Installed {} IPA(s)", installed.len()));
+    crate::tools::runner::emit_log(
+        &app,
+        "info",
+        &format!("Installed {} IPA(s)", installed.len()),
+    );
     Ok(InstallIpaResult { installed })
 }
 
@@ -125,8 +129,14 @@ fn parse_ideviceinstaller_list(output: &str) -> Vec<InstalledApp> {
         if bundle_id.is_empty() {
             continue;
         }
-        let version = fields.get(1).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
-        let display_name = fields.get(2).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        let version = fields
+            .get(1)
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        let display_name = fields
+            .get(2)
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
         apps.push(InstalledApp {
             bundle_id,
             display_name,
@@ -210,8 +220,10 @@ Total: 1 app(s)
 
     #[test]
     fn handles_doubled_quotes() {
-        let apps = parse_ideviceinstaller_list(r#""com.q.app", "1", "He said ""hi"""
-"#);
+        let apps = parse_ideviceinstaller_list(
+            r#""com.q.app", "1", "He said ""hi"""
+"#,
+        );
         assert_eq!(apps.len(), 1);
         assert_eq!(apps[0].display_name.as_deref(), Some(r#"He said "hi""#));
     }

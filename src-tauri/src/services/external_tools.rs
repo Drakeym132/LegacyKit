@@ -105,9 +105,14 @@ pub async fn ensure_tool(
     }
     fs::create_dir_all(&install_dir)?;
 
-    let archive_path = layout.tmp_dir().join(format!("{}.tar.gz", spec.install_dir_name));
+    let archive_path = layout
+        .tmp_dir()
+        .join(format!("{}.tar.gz", spec.install_dir_name));
     fs::create_dir_all(layout.tmp_dir())?;
-    log(&format!("Downloading {} from {}", spec.install_dir_name, spec.url));
+    log(&format!(
+        "Downloading {} from {}",
+        spec.install_dir_name, spec.url
+    ));
     download_to_file(spec.url, &archive_path).await?;
 
     let actual_sha = sha1_file(&archive_path.to_string_lossy())
@@ -120,7 +125,11 @@ pub async fn ensure_tool(
         )));
     }
 
-    log(&format!("Extracting {} to {}", spec.install_dir_name, install_dir.display()));
+    log(&format!(
+        "Extracting {} to {}",
+        spec.install_dir_name,
+        install_dir.display()
+    ));
     extract_tar_gz(&archive_path, &install_dir)?;
     let _ = fs::remove_file(&archive_path);
 
@@ -179,10 +188,7 @@ fn read_marker(path: &Path) -> Option<String> {
 }
 
 /// Convenience wrapper used by Tauri commands and `enter_pwndfu`.
-pub async fn ensure_pwn_tool(
-    app: &AppHandle,
-    tool: ExternalTool,
-) -> Result<PathBuf, AppError> {
+pub async fn ensure_pwn_tool(app: &AppHandle, tool: ExternalTool) -> Result<PathBuf, AppError> {
     let layout = crate::services::workspace::get_layout(app)?;
     let spec = spec_for(tool, std::env::consts::OS, std::env::consts::ARCH)?;
     ensure_tool(&layout, &spec, |msg| {
@@ -223,7 +229,10 @@ mod tests {
 
     #[test]
     fn from_name_known_and_unknown() {
-        assert!(matches!(ExternalTool::from_name("kuroutadori"), Some(ExternalTool::Kuroutadori)));
+        assert!(matches!(
+            ExternalTool::from_name("kuroutadori"),
+            Some(ExternalTool::Kuroutadori)
+        ));
         assert!(ExternalTool::from_name("nope").is_none());
     }
 }

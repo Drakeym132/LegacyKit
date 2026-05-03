@@ -156,9 +156,8 @@ mod tests {
 
     #[test]
     fn parses_tsschecker_underscore_form() {
-        let parsed = parse_blob_filename(
-            "1234567890_iPhone6,2_n53ap_10.3.3-14G60_0x1111111111111111.shsh2",
-        );
+        let parsed =
+            parse_blob_filename("1234567890_iPhone6,2_n53ap_10.3.3-14G60_0x1111111111111111.shsh2");
         assert_eq!(parsed.device_type.as_deref(), Some("iPhone6,2"));
         assert_eq!(parsed.device_ecid.as_deref(), Some("1234567890"));
         assert_eq!(parsed.ios_version.as_deref(), Some("10.3.3"));

@@ -143,7 +143,11 @@ pub async fn set_glass_chrome(app: AppHandle, enabled: bool) -> Result<(), AppEr
                 crate::set_vibrancy_visible(&window, enabled);
             }
         })
-        .map_err(|err| AppError::CommandFailed(format!("Failed to toggle glass chrome on main thread: {err}")))?;
+        .map_err(|err| {
+            AppError::CommandFailed(format!(
+                "Failed to toggle glass chrome on main thread: {err}"
+            ))
+        })?;
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -175,7 +179,9 @@ pub async fn set_window_shadow(app: AppHandle, enabled: bool) -> Result<(), AppE
                 }
             }
         })
-        .map_err(|err| AppError::CommandFailed(format!("Failed to run shadow toggle on main thread: {err}")))?;
+        .map_err(|err| {
+            AppError::CommandFailed(format!("Failed to run shadow toggle on main thread: {err}"))
+        })?;
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -247,12 +253,19 @@ mod tests {
     #[test]
     fn valid_temp_dir_succeeds() {
         let temp_base = std::env::temp_dir();
-        let unique_subpath = format!("legacykit-test-{}-{}", std::process::id(), uuid::Uuid::new_v4());
+        let unique_subpath = format!(
+            "legacykit-test-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        );
         let workspace_path = temp_base.join(&unique_subpath);
         let path_str = workspace_path.to_string_lossy().to_string();
 
         let result = validate_workspace_path(&path_str);
-        assert!(result.is_ok(), "Expected validation to succeed for temp dir path");
+        assert!(
+            result.is_ok(),
+            "Expected validation to succeed for temp dir path"
+        );
 
         // Cleanup if the test created anything
         let _ = fs::remove_dir_all(&workspace_path);

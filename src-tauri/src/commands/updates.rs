@@ -20,14 +20,10 @@ pub struct UpdateCheckResult {
 }
 
 #[tauri::command]
-pub async fn check_for_updates(
-    request: UpdateCheckRequest,
-) -> Result<UpdateCheckResult, AppError> {
+pub async fn check_for_updates(request: UpdateCheckRequest) -> Result<UpdateCheckResult, AppError> {
     let repo = request.repo.trim();
     if repo.is_empty() || !repo.contains('/') {
-        return Err(AppError::Parse(
-            "Repo must be in 'owner/name' form".into(),
-        ));
+        return Err(AppError::Parse("Repo must be in 'owner/name' form".into()));
     }
     let current = request.current_version.trim().to_string();
     if current.is_empty() {
@@ -62,7 +58,9 @@ pub async fn check_for_updates(
         .stderr(Stdio::piped())
         .output()?;
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_lowercase();
+        let stderr = String::from_utf8_lossy(&output.stderr)
+            .trim()
+            .to_lowercase();
         return Err(AppError::CommandFailed(
             if stderr.contains("403") || stderr.contains("rate limit") {
                 "GitHub rate limit exceeded. Set GITHUB_TOKEN to raise the anonymous limit (60 req/h → 5000 req/h).".into()
@@ -177,7 +175,10 @@ mod tests {
     #[test]
     fn parse_html_url() {
         let body = r#"{"tag_name":"1.2.3","html_url":"https://github.com/x/y/releases/tag/1.2.3"}"#;
-        assert_eq!(parse_json_string(body, "tag_name").as_deref(), Some("1.2.3"));
+        assert_eq!(
+            parse_json_string(body, "tag_name").as_deref(),
+            Some("1.2.3")
+        );
         assert_eq!(
             parse_json_string(body, "html_url").as_deref(),
             Some("https://github.com/x/y/releases/tag/1.2.3"),

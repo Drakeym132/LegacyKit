@@ -75,9 +75,7 @@ pub async fn list_firmwares(request: FirmwareListRequest) -> Result<FirmwareList
         return Ok(cached);
     }
 
-    let url = format!(
-        "https://api.ipsw.me/v4/device/{device_identifier}?type=ipsw"
-    );
+    let url = format!("https://api.ipsw.me/v4/device/{device_identifier}?type=ipsw");
     let response_body = reqwest::Client::new()
         .get(url)
         .header("User-Agent", "LegacyKit/1.0")
@@ -93,13 +91,17 @@ pub async fn list_firmwares(request: FirmwareListRequest) -> Result<FirmwareList
     let payload: Value = serde_json::from_str(&response_body)
         .map_err(|e| AppError::Parse(format!("Invalid firmware payload JSON: {e}")))?;
     let mut firmwares = parse_firmwares_from_payload(&payload)?;
-    firmwares.sort_by(|a, b| b.version.cmp(&a.version).then_with(|| b.build_id.cmp(&a.build_id)));
+    firmwares.sort_by(|a, b| {
+        b.version
+            .cmp(&a.version)
+            .then_with(|| b.build_id.cmp(&a.build_id))
+    });
 
     let fetched_at_unix = Utc::now().timestamp();
     {
-        let mut cache = firmware_cache().lock().map_err(|_| {
-            AppError::CommandFailed("Failed to lock firmware cache".to_string())
-        })?;
+        let mut cache = firmware_cache()
+            .lock()
+            .map_err(|_| AppError::CommandFailed("Failed to lock firmware cache".to_string()))?;
         cache.insert(
             device_identifier.clone(),
             FirmwareCacheEntry {
@@ -148,9 +150,14 @@ pub async fn check_ipsw_signing(
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let combined = format!("{}{}{}", stdout, if stderr.is_empty() { "" } else { "\n" }, stderr)
-        .trim()
-        .to_string();
+    let combined = format!(
+        "{}{}{}",
+        stdout,
+        if stderr.is_empty() { "" } else { "\n" },
+        stderr
+    )
+    .trim()
+    .to_string();
 
     let signed = output.status.success();
     crate::tools::runner::emit_log(
@@ -251,7 +258,11 @@ pub async fn download_ipsw(
             "IPSW download filename must end with .ipsw".to_string(),
         ));
     }
-    if Path::new(&file_name).file_name().and_then(|name| name.to_str()) != Some(file_name.as_str()) {
+    if Path::new(&file_name)
+        .file_name()
+        .and_then(|name| name.to_str())
+        != Some(file_name.as_str())
+    {
         return Err(AppError::Parse(
             "IPSW download filename cannot include path separators".to_string(),
         ));
@@ -397,9 +408,7 @@ pub async fn prepare_ipsw(
         .filter(|s| !s.is_empty());
     if let Some(shsh) = shsh_path {
         if !Path::new(shsh).exists() {
-            return Err(AppError::Parse(format!(
-                "SHSH blob does not exist: {shsh}"
-            )));
+            return Err(AppError::Parse(format!("SHSH blob does not exist: {shsh}")));
         }
     }
 
@@ -409,10 +418,8 @@ pub async fn prepare_ipsw(
         .map(str::trim)
         .filter(|s| !s.is_empty());
 
-    let output_path = ipsw_prep::powdersn0w_output_path(
-        ipsw_path,
-        output_dir.to_string_lossy().as_ref(),
-    )?;
+    let output_path =
+        ipsw_prep::powdersn0w_output_path(ipsw_path, output_dir.to_string_lossy().as_ref())?;
     let args = ipsw_prep::build_powdersn0w_args(ipsw_path, &output_path, shsh_path, ecid);
 
     let binary = resolve_binary_path(&app, "powdersn0w").map_err(AppError::CommandFailed)?;

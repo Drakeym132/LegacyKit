@@ -77,10 +77,7 @@ pub async fn run_diagnostics_action(
 }
 
 #[tauri::command]
-pub async fn pair_device(
-    app: AppHandle,
-    request: PairRequest,
-) -> Result<PairResult, AppError> {
+pub async fn pair_device(app: AppHandle, request: PairRequest) -> Result<PairResult, AppError> {
     let binary = resolve_binary_path(&app, "idevicepair").map_err(AppError::CommandFailed)?;
     let mut args: Vec<String> = Vec::new();
     if let Some(udid) = nullable(request.udid.as_deref()) {
@@ -108,8 +105,7 @@ pub async fn run_activation_action(
     app: AppHandle,
     request: ActivationRequest,
 ) -> Result<ActivationResult, AppError> {
-    let binary =
-        resolve_binary_path(&app, "ideviceactivation").map_err(AppError::CommandFailed)?;
+    let binary = resolve_binary_path(&app, "ideviceactivation").map_err(AppError::CommandFailed)?;
     let mut args: Vec<String> = Vec::new();
     if let Some(udid) = nullable(request.udid.as_deref()) {
         args.push("-u".into());
@@ -122,11 +118,7 @@ pub async fn run_activation_action(
     };
     args.push(action_arg.to_string());
 
-    crate::tools::runner::emit_log(
-        &app,
-        "info",
-        &format!("ideviceactivation {action_arg}"),
-    );
+    crate::tools::runner::emit_log(&app, "info", &format!("ideviceactivation {action_arg}"));
 
     if matches!(request.action, ActivationAction::State) {
         let output = Command::new(&binary)
@@ -164,7 +156,8 @@ pub async fn export_device_info(
     app: AppHandle,
     request: ExportInfoRequest,
 ) -> Result<ExportInfoResult, AppError> {
-    let output_dir = resolve_export_output_dir(&app, request.output_dir.as_deref(), request.udid.as_deref())?;
+    let output_dir =
+        resolve_export_output_dir(&app, request.output_dir.as_deref(), request.udid.as_deref())?;
 
     let (binary_name, base_args, label_default) = match request.kind {
         ExportInfoKind::DeviceInfo => ("ideviceinfo", Vec::<String>::new(), "device-info"),
@@ -255,7 +248,9 @@ pub async fn run_irecovery_commands(
     request: IrecoveryCommandRequest,
 ) -> Result<IrecoveryCommandResult, AppError> {
     if request.commands.is_empty() {
-        return Err(AppError::Parse("At least one irecovery command is required".into()));
+        return Err(AppError::Parse(
+            "At least one irecovery command is required".into(),
+        ));
     }
     let binary = resolve_binary_path(&app, "irecovery").map_err(AppError::CommandFailed)?;
     let mut all_args: Vec<String> = Vec::new();

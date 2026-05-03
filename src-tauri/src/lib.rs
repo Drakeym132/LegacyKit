@@ -1,9 +1,9 @@
-pub mod platform;
-pub mod tools;
+pub mod commands;
 pub mod error;
 pub mod models;
-pub mod commands;
+pub mod platform;
 pub mod services;
+pub mod tools;
 
 #[cfg(target_os = "macos")]
 const WINDOW_CORNER_RADIUS: f64 = 28.0;
@@ -13,15 +13,23 @@ fn apply_window_corner_radius(window: &tauri::WebviewWindow) {
     use objc::runtime::{Object, Sel, NO, YES};
     use objc::{class, msg_send, sel, sel_impl};
 
-    let Ok(ns_window) = window.ns_window() else { return };
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
     let ns_window = ns_window as *mut Object;
-    if ns_window.is_null() { return; }
+    if ns_window.is_null() {
+        return;
+    }
 
     unsafe fn round_layer(view: *mut Object, radius: f64) {
-        if view.is_null() { return; }
+        if view.is_null() {
+            return;
+        }
         let _: () = msg_send![view, setWantsLayer: YES];
         let layer: *mut Object = msg_send![view, layer];
-        if layer.is_null() { return; }
+        if layer.is_null() {
+            return;
+        }
         let _: () = msg_send![layer, setCornerRadius: radius];
         let _: () = msg_send![layer, setMasksToBounds: YES];
     }
@@ -30,9 +38,13 @@ fn apply_window_corner_radius(window: &tauri::WebviewWindow) {
     // rounded path on the NSThemeFrame layer; without this a thin rim is
     // visible just outside the rounded corners.
     unsafe fn neutralize_layer_chrome(view: *mut Object) {
-        if view.is_null() { return; }
+        if view.is_null() {
+            return;
+        }
         let layer: *mut Object = msg_send![view, layer];
-        if layer.is_null() { return; }
+        if layer.is_null() {
+            return;
+        }
 
         let _: () = msg_send![layer, setBorderWidth: 0.0_f64];
         let nil_color: *mut Object = std::ptr::null_mut();
@@ -48,10 +60,14 @@ fn apply_window_corner_radius(window: &tauri::WebviewWindow) {
     // NSWindow container), otherwise a white NSView/WKWebView background can
     // still show through even when the window itself is transparent.
     unsafe fn clear_view_background_recursive(view: *mut Object) {
-        if view.is_null() { return; }
+        if view.is_null() {
+            return;
+        }
 
         unsafe fn responds_to(view: *mut Object, selector: Sel) -> bool {
-            if view.is_null() { return false; }
+            if view.is_null() {
+                return false;
+            }
             msg_send![view, respondsToSelector: selector]
         }
 
@@ -89,7 +105,9 @@ fn apply_window_corner_radius(window: &tauri::WebviewWindow) {
 
     unsafe {
         let content_view: *mut Object = msg_send![ns_window, contentView];
-        if content_view.is_null() { return; }
+        if content_view.is_null() {
+            return;
+        }
         round_layer(content_view, WINDOW_CORNER_RADIUS);
 
         // The contentView's superview is the NSWindow's frame view (NSThemeFrame).
@@ -124,7 +142,9 @@ fn apply_window_corner_radius(window: &tauri::WebviewWindow) {
 // returns Err which we ignore.
 #[cfg(target_os = "macos")]
 pub(crate) fn set_vibrancy_visible(window: &tauri::WebviewWindow, visible: bool) {
-    use window_vibrancy::{apply_vibrancy, clear_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+    use window_vibrancy::{
+        apply_vibrancy, clear_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
+    };
 
     if visible {
         let _ = apply_vibrancy(
@@ -143,7 +163,9 @@ pub(crate) fn set_vibrancy_visible(window: &tauri::WebviewWindow, visible: bool)
     if let Ok(ns_window) = window.ns_window() {
         let ns_window = ns_window as *mut Object;
         if !ns_window.is_null() {
-            unsafe { let _: () = msg_send![ns_window, invalidateShadow]; }
+            unsafe {
+                let _: () = msg_send![ns_window, invalidateShadow];
+            }
         }
     }
 }
@@ -172,7 +194,9 @@ pub fn run() {
                 }
             }
             #[cfg(not(target_os = "macos"))]
-            { let _ = app; }
+            {
+                let _ = app;
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

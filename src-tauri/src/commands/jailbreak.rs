@@ -40,10 +40,7 @@ pub struct GasterResult {
 }
 
 #[tauri::command]
-pub async fn run_gaster(
-    app: AppHandle,
-    request: GasterRequest,
-) -> Result<GasterResult, AppError> {
+pub async fn run_gaster(app: AppHandle, request: GasterRequest) -> Result<GasterResult, AppError> {
     let binary = resolve_binary_path(&app, "gaster").map_err(AppError::CommandFailed)?;
     let args = vec![request.action.as_arg().to_string()];
 
@@ -113,7 +110,10 @@ pub async fn run_kloader(
     crate::tools::runner::emit_log(
         &app,
         "info",
-        &format!("Booting patched components with kloader: {}", args.join(" ")),
+        &format!(
+            "Booting patched components with kloader: {}",
+            args.join(" ")
+        ),
     );
     crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
     crate::tools::runner::emit_log(&app, "info", "kloader finished");
@@ -314,7 +314,9 @@ struct PwnPlan {
 
 async fn resolve_pwn_tool(app: &AppHandle, source: &ToolSource) -> Result<PathBuf, AppError> {
     match source {
-        ToolSource::Bundled(name) => resolve_binary_path(app, name).map_err(AppError::CommandFailed),
+        ToolSource::Bundled(name) => {
+            resolve_binary_path(app, name).map_err(AppError::CommandFailed)
+        }
         ToolSource::External(tool) => ensure_pwn_tool(app, *tool).await,
     }
 }
@@ -478,7 +480,7 @@ mod tests {
         let plan = pick_pwn_tool(6, "macos", "aarch64", "iPhone5,1").unwrap();
         assert_bundled(&plan, "ipwnder");
         assert_eq!(plan.args, vec!["-p"]);
-        assert!(!plan.run_gaster_reset);  // A6 should not run gaster reset (only A7+)
+        assert!(!plan.run_gaster_reset); // A6 should not run gaster reset (only A7+)
     }
 
     #[test]

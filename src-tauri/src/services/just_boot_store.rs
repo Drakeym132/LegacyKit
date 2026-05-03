@@ -110,7 +110,9 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), AppError> {
 
     let tmp_name = format!(
         ".{}.{}.tmp",
-        path.file_name().and_then(|n| n.to_str()).unwrap_or("history"),
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("history"),
         std::process::id()
     );
     let tmp_path = parent.join(tmp_name);

@@ -161,9 +161,11 @@ fn rotate_logs(logs_dir: &PathBuf) -> Result<(), AppError> {
 
 /// Rotate logs and reopen the writer with a new file.
 fn rotate_and_reopen(writer: &mut LogWriter) -> Result<(), AppError> {
-    let logs_dir = writer.path.parent().ok_or_else(|| {
-        AppError::Parse("Log file has no parent directory".into())
-    })?.to_path_buf();
+    let logs_dir = writer
+        .path
+        .parent()
+        .ok_or_else(|| AppError::Parse("Log file has no parent directory".into()))?
+        .to_path_buf();
 
     rotate_logs(&logs_dir)?;
 

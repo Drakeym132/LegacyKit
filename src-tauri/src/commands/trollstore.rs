@@ -31,7 +31,11 @@ pub async fn prepare_trollstore_assets(
         Some(v) if !v.trim().is_empty() => v.trim().to_string(),
         _ => fetch_latest_version(&app)?,
     };
-    crate::tools::runner::emit_log(&app, "info", &format!("Latest TrollStore version: {latest}"));
+    crate::tools::runner::emit_log(
+        &app,
+        "info",
+        &format!("Latest TrollStore version: {latest}"),
+    );
 
     let cached_version = fs::read_to_string(&version_stamp)
         .ok()
@@ -60,16 +64,21 @@ pub async fn prepare_trollstore_assets(
     let _ = fs::remove_file(&tar_path);
     let _ = fs::remove_file(&helper_path);
 
-    let tar_url = format!(
-        "https://github.com/opa334/TrollStore/releases/download/{latest}/TrollStore.tar"
-    );
+    let tar_url =
+        format!("https://github.com/opa334/TrollStore/releases/download/{latest}/TrollStore.tar");
     let helper_url = format!(
         "https://github.com/opa334/TrollStore/releases/download/{latest}/PersistenceHelper_Embedded"
     );
 
     let aria2c = resolve_binary_path(&app, "aria2c").map_err(AppError::CommandFailed)?;
     download_with_aria2(&app, &aria2c, &tar_url, dest, "TrollStore.tar")?;
-    download_with_aria2(&app, &aria2c, &helper_url, dest, "PersistenceHelper_Embedded")?;
+    download_with_aria2(
+        &app,
+        &aria2c,
+        &helper_url,
+        dest,
+        "PersistenceHelper_Embedded",
+    )?;
 
     if !tar_path.exists() || !helper_path.exists() {
         return Err(AppError::CommandFailed(
@@ -81,7 +90,10 @@ pub async fn prepare_trollstore_assets(
     crate::tools::runner::emit_log(
         &app,
         "info",
-        &format!("Downloaded TrollStore {latest} assets to {}", dest.display()),
+        &format!(
+            "Downloaded TrollStore {latest} assets to {}",
+            dest.display()
+        ),
     );
 
     Ok(TrollStorePrepareResult {
@@ -96,10 +108,7 @@ pub async fn prepare_trollstore_assets(
 pub async fn check_trollstore_eligibility(
     request: TrollStoreEligibilityRequest,
 ) -> Result<TrollStoreEligibilityResult, AppError> {
-    let major = request
-        .ios_version
-        .as_deref()
-        .and_then(parse_ios_major);
+    let major = request.ios_version.as_deref().and_then(parse_ios_major);
     let product = request.product_type.as_deref().map(str::to_lowercase);
 
     let Some(major) = major else {
@@ -113,9 +122,7 @@ pub async fn check_trollstore_eligibility(
     if major < 14 {
         return Ok(TrollStoreEligibilityResult {
             path: TrollStorePath::Incompatible,
-            reason: format!(
-                "TrollStore requires iOS 14 or newer (detected iOS {major}.x)."
-            ),
+            reason: format!("TrollStore requires iOS 14 or newer (detected iOS {major}.x)."),
             ios_major: Some(major),
         });
     }

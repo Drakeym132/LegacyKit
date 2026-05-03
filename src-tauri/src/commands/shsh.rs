@@ -98,9 +98,7 @@ pub async fn save_shsh_blob(
     crate::tools::runner::emit_log(
         &app,
         "info",
-        &format!(
-            "Saving SHSH for {device_type} ({device_ecid}) at iOS {ios_version}"
-        ),
+        &format!("Saving SHSH for {device_type} ({device_ecid}) at iOS {ios_version}"),
     );
 
     let blobs_before = collect_blob_paths(&output_dir);
@@ -175,13 +173,11 @@ pub async fn fetch_cydia_blobs(
         match run_process_capturing(&binary, &args) {
             Ok(_) => {
                 let blobs_after = collect_blob_paths(&output_dir);
-                let new_blob = blobs_after
-                    .into_iter()
-                    .find(|p| !blobs_before.contains(p));
+                let new_blob = blobs_after.into_iter().find(|p| !blobs_before.contains(p));
                 match new_blob {
                     Some(found) => {
-                        let dest = output_dir
-                            .join(format!("{device_ecid}-{device_type}-{build}.shsh"));
+                        let dest =
+                            output_dir.join(format!("{device_ecid}-{device_type}-{build}.shsh"));
                         let final_path = if Path::new(&found) == dest {
                             found
                         } else {
@@ -366,7 +362,10 @@ fn collect_blob_paths(dir: &Path) -> Vec<String> {
             if !path.is_file() {
                 return None;
             }
-            let ext = path.extension().and_then(OsStr::to_str)?.to_ascii_lowercase();
+            let ext = path
+                .extension()
+                .and_then(OsStr::to_str)?
+                .to_ascii_lowercase();
             if ext == "shsh" || ext == "shsh2" {
                 Some(path.to_string_lossy().to_string())
             } else {

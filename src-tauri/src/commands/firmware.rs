@@ -34,9 +34,7 @@ pub async fn extract_ipsw_component(
         return Err(AppError::Parse("IPSW path is required".to_string()));
     }
     if !Path::new(ipsw_path).exists() {
-        return Err(AppError::Parse(format!(
-            "IPSW does not exist: {ipsw_path}"
-        )));
+        return Err(AppError::Parse(format!("IPSW does not exist: {ipsw_path}")));
     }
 
     let component_path = request.component_path.trim();
@@ -177,8 +175,8 @@ pub async fn patch_iboot(
     }
 
     let args = build_iboot_args(&request);
-    let binary =
-        resolve_binary_path(&app, request.bit_width.binary_name()).map_err(AppError::CommandFailed)?;
+    let binary = resolve_binary_path(&app, request.bit_width.binary_name())
+        .map_err(AppError::CommandFailed)?;
 
     crate::tools::runner::emit_log(
         &app,
@@ -294,11 +292,7 @@ pub async fn pack_img4(
     let args = build_img4_pack_args(im4p_path, output_path, shsh_path, im4m_path);
     let binary = resolve_binary_path(&app, "img4tool").map_err(AppError::CommandFailed)?;
 
-    crate::tools::runner::emit_log(
-        &app,
-        "info",
-        &format!("Packing IMG4 -> {output_path}"),
-    );
+    crate::tools::runner::emit_log(&app, "info", &format!("Packing IMG4 -> {output_path}"));
     crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
 
     if !Path::new(output_path).exists() {
@@ -405,11 +399,7 @@ pub async fn repack_img3(
     let args = build_img3_repack_args(input_path, output_path, template_path, key, iv);
     let binary = resolve_binary_path(&app, "xpwntool").map_err(AppError::CommandFailed)?;
 
-    crate::tools::runner::emit_log(
-        &app,
-        "info",
-        &format!("Repacking IMG3 -> {output_path}"),
-    );
+    crate::tools::runner::emit_log(&app, "info", &format!("Repacking IMG3 -> {output_path}"));
     crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
 
     if !Path::new(output_path).exists() {
@@ -520,9 +510,7 @@ fn build_ramdisk_args(request: &RamdiskModifyRequest) -> Result<Vec<String>, App
                 .as_deref()
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
-                .ok_or_else(|| {
-                    AppError::Parse("`Add` requires a source path".to_string())
-                })?;
+                .ok_or_else(|| AppError::Parse("`Add` requires a source path".to_string()))?;
             let target = request
                 .target_path
                 .as_deref()
@@ -555,9 +543,9 @@ fn build_ramdisk_args(request: &RamdiskModifyRequest) -> Result<Vec<String>, App
             args.push(target.to_string());
         }
         RamdiskAction::Resize => {
-            let size = request.size_mb.ok_or_else(|| {
-                AppError::Parse("`Resize` requires a size in MB".to_string())
-            })?;
+            let size = request
+                .size_mb
+                .ok_or_else(|| AppError::Parse("`Resize` requires a size in MB".to_string()))?;
             if size == 0 {
                 return Err(AppError::Parse("Resize size must be > 0".to_string()));
             }
@@ -604,7 +592,9 @@ pub async fn patch_kernel(
 
     let output_path = request.output_path.trim();
     if output_path.is_empty() {
-        return Err(AppError::Parse("Kernel output path is required".to_string()));
+        return Err(AppError::Parse(
+            "Kernel output path is required".to_string(),
+        ));
     }
     if let Some(parent) = Path::new(output_path).parent() {
         fs::create_dir_all(parent)?;
@@ -795,10 +785,7 @@ mod tests {
             size_mb: None,
         };
         let args = build_ramdisk_args(&request).unwrap();
-        assert_eq!(
-            args,
-            vec!["/tmp/rd.dmg", "rm", "/usr/local/bin/dropbear"]
-        );
+        assert_eq!(args, vec!["/tmp/rd.dmg", "rm", "/usr/local/bin/dropbear"]);
     }
 
     #[test]
