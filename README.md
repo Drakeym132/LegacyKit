@@ -13,11 +13,6 @@ established command-line ecosystem (`futurerestore`, `idevicerestore`, `gaster`,
 `ipwnder`, `tsschecker`, `ipsw`, and friends) and surfaces their workflows as
 guided, log-streamed flows in a single window.
 
-The project began as a UI replacement for the long-running Legacy iOS Kit bash
-script. If you're coming from `restore.sh`, see
-[`docs/MIGRATION-FROM-BASH.md`](docs/MIGRATION-FROM-BASH.md:1) for a menu-by-menu
-mapping and a description of the shared on-disk workspace layout.
-
 Supported on **macOS** (x64 + arm64) and **Linux** (x64 + arm64). Windows is not
 currently a target.
 
@@ -39,8 +34,6 @@ currently a target.
   persistent, searchable log
 - **Workspace-based state** — all artifacts live under a user-chosen `saved/`
   directory, compatible with the legacy bash layout
-
-For per-view walkthroughs, see [`docs/USER-GUIDE.md`](docs/USER-GUIDE.md:1).
 
 ## Install / Download
 
@@ -86,11 +79,6 @@ saved/
 └── TrollStore_version          # version stamp for cache invalidation
 ```
 
-Run logs are written under `<workspace>/logs/` with one file per session,
-streamed in real time to the terminal deck. See
-[`docs/MIGRATION-FROM-BASH.md`](docs/MIGRATION-FROM-BASH.md:1) for additional
-detail.
-
 ## Development
 
 ### Prerequisites
@@ -119,7 +107,6 @@ pnpm tsc --noEmit -p tsconfig.app.json
 cd src-tauri && cargo fmt && cargo clippy --all-targets
 ```
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md:1) for the full pre-PR checklist.
 
 ## Project structure
 
@@ -170,33 +157,12 @@ LegacyKit/
 └── LICENSE
 ```
 
-## Sidecar binaries
-
-LegacyKit shells out to a curated set of CLI tools (futurerestore, idevicerestore,
-gaster, ipwnder, tsschecker, ipsw, irecovery, img4tool, kloader, etc.). At
-release time, platform/arch-specific builds of these tools are bundled into
-[`src-tauri/binaries/`](src-tauri/Cargo.toml:1) and resolved at runtime by
-`src-tauri/src/platform.rs`.
-
-The `binaries/` directory is **gitignored** — it is never committed and contains
-no source code, only third-party binaries assembled at release time.
-Contributors who want to run `pnpm tauri dev` against a real device need to
-populate this directory locally; an archive will be attached to releases (TBD)
-or built from the upstream tool sources.
-
-See [`docs/SIDECAR-BINARIES.md`](docs/SIDECAR-BINARIES.md:1) for the expected
-`src-tauri/binaries/` layout and tool inventory.
-
 ## CI
 
 - [`ci.yml`](.github/workflows/ci.yml:1) runs `svelte-check`, `tsc`, `cargo fmt`,
   and `cargo clippy` on Ubuntu and macOS for every PR.
 - `release.yml` builds the macOS and Linux bundles on tagged releases.
 
-## Contributing
-
-PRs are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md:1) for the dev setup,
-branch conventions, and pre-PR checklist.
 
 ## Security
 
