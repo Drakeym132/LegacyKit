@@ -4,8 +4,7 @@
 *.im4p
 *.ipa
 *.ipsw
-*.json
-!package.json
+package-lock.json
 *.shsh
 *.shsh2
 *.txt
