@@ -8,7 +8,7 @@ use crate::services::workspace;
 use chrono::Local;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use tauri::AppHandle;
 
@@ -133,7 +133,7 @@ pub fn get_log_file_path(app: &AppHandle) -> Result<PathBuf, AppError> {
 
 /// Rotate log files: legacykit.log -> legacykit.1.log, etc.
 /// Deletes the oldest file when MAX_ROTATED_FILES is exceeded.
-fn rotate_logs(logs_dir: &PathBuf) -> Result<(), AppError> {
+fn rotate_logs(logs_dir: &Path) -> Result<(), AppError> {
     // Delete the oldest rotated file if it exists.
     let oldest = logs_dir.join(format!("legacykit.{}.log", MAX_ROTATED_FILES));
     if oldest.exists() {

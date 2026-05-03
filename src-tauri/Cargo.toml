@@ -35,3 +35,11 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
 window-vibrancy = "0.6"
+
+# The `objc 0.2.x` crate is unmaintained and its `msg_send!` / `class!` /
+# `sel!` macros expand to `#[cfg(feature = "cargo-clippy")]` checks that
+# trigger the `unexpected_cfgs` lint added in modern rustc. Until we migrate
+# off `objc 0.2`, allow the lint at the crate level. This affects only our
+# own crate's lint reporting, not transitive dependencies.
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
