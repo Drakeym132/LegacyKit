@@ -5,7 +5,8 @@
   let terminalContainer: HTMLDivElement | null = null;
 
   $effect(() => {
-    const _logs = logStore.logs;
+    // Track logStore.logs reactively to trigger scroll on changes
+    logStore.logs;
 
     if (terminalContainer) {
       tick().then(() => {

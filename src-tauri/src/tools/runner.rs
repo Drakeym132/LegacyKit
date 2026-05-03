@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::services::log_persist;
 use serde::Serialize;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -14,7 +15,12 @@ pub struct LogEventPayload {
 }
 
 /// Emit a log_event payload to the frontend (`log_event` channel).
+/// Also persists the log entry to disk for post-mortem debugging.
 pub fn emit_log(app: &AppHandle, kind: &str, text: &str) {
+    // Persist to disk (non-blocking on failure).
+    log_persist::append(kind, text);
+
+    // Emit to frontend.
     let _ = app.emit(
         "log_event",
         LogEventPayload {

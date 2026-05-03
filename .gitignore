@@ -40,3 +40,15 @@ npm-debug.log*
 # --- Rust (Tauri backend) ---
 /src-tauri/target/
 /src-tauri/gen/schemas
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+
+# --- AI agent local state (keep .roomodes committed) ---
+.claude/
+.roo/
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db

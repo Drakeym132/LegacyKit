@@ -81,23 +81,23 @@
     <div class="title-right">
       {#if !isMacOS}
         <button class="window-control" onclick={minimize} aria-label="Minimize">
-          <svg width="10" height="1" viewBox="0 0 10 1">
+          <svg aria-hidden="true" focusable="false" width="10" height="1" viewBox="0 0 10 1">
             <rect width="10" height="1" fill="currentColor" />
           </svg>
         </button>
         <button class="window-control" onclick={toggleMaximize} aria-label={isMaximized ? 'Restore' : 'Maximize'}>
           {#if isMaximized}
-            <svg width="10" height="10" viewBox="0 0 10 10">
+            <svg aria-hidden="true" focusable="false" width="10" height="10" viewBox="0 0 10 10">
               <path d="M2 0h6a2 2 0 012 2v6a2 2 0 01-2 2H2a2 2 0 01-2-2V2a2 2 0 012-2zm0 1a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V2a1 1 0 00-1-1H2z" fill="currentColor" />
             </svg>
           {:else}
-            <svg width="10" height="10" viewBox="0 0 10 10">
+            <svg aria-hidden="true" focusable="false" width="10" height="10" viewBox="0 0 10 10">
               <rect x="0" y="0" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1" fill="none" />
             </svg>
           {/if}
         </button>
         <button class="window-control window-control-close" onclick={close} aria-label="Close">
-          <svg width="10" height="10" viewBox="0 0 10 10">
+          <svg aria-hidden="true" focusable="false" width="10" height="10" viewBox="0 0 10 10">
             <path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
           </svg>
         </button>

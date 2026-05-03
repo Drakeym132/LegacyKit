@@ -1,9 +1,9 @@
 //! Lazy on-demand fetch + cache for pwn tools that aren't bundled with the app.
 //!
-//! Mirrors `kuroutadori_init` in `restore.sh:2405-2428`: download a `.tar.gz` from
-//! `sep.lol/files/legacypreviews`, verify SHA-1, extract to a known cache directory,
-//! and hand back the binary path. Idempotent — repeat calls are a no-op once the
-//! sha1check sentinel matches.
+//! Mirrors the `kuroutadori_init` workflow from the legacy bash implementation:
+//! download a `.tar.gz` from `sep.lol/files/legacypreviews`, verify SHA-1, extract
+//! to a known cache directory, and hand back the binary path. Idempotent — repeat
+//! calls are a no-op once the sha1check sentinel matches.
 
 use crate::error::AppError;
 use crate::services::sha1::sha1_file;
@@ -33,7 +33,8 @@ impl ExternalTool {
 
 #[derive(Debug)]
 pub struct ToolSpec {
-    /// Stable directory name under `<workspace>/tools/`. Matches `kuroutadori="kuroutadori_${platform}"` in restore.sh.
+    /// Stable directory name under `<workspace>/tools/`. Matches the naming convention
+    /// from the legacy bash implementation: `kuroutadori="kuroutadori_${platform}"`.
     pub install_dir_name: String,
     pub url: &'static str,
     pub sha1: &'static str,
@@ -42,7 +43,7 @@ pub struct ToolSpec {
 }
 
 /// Resolves the right URL + sha1 + install dir for the running platform.
-/// Mirrors `kuroutadori_init` in `restore.sh:2405-2428`.
+/// Mirrors the `kuroutadori_init` workflow from the legacy bash implementation.
 pub fn kuroutadori_spec(os: &str, arch: &str) -> Result<ToolSpec, AppError> {
     match (os, arch) {
         ("macos", _) => Ok(ToolSpec {

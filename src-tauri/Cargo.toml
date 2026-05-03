@@ -1,10 +1,10 @@
 [package]
 name = "legacykit"
-version = "0.1.0"
-description = "LegacyKit — restore, jailbreak, and manage legacy iOS devices"
+version = "1.0.0"
+description = "Cross-platform iOS device restore, downgrade, and jailbreak toolkit (Tauri + Svelte)."
 authors = ["LegacyKit contributors"]
-license = ""
-repository = ""
+license = "GPL-3.0-or-later"
+repository = "https://github.com/Drakeym132/LegacyKit"
 edition = "2021"
 rust-version = "1.77.2"
 

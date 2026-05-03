@@ -42,7 +42,7 @@
   let deviceEcid = $derived(deviceState.ecid);
   let deviceProductType = $derived(deviceState.product_type);
   let procGen = $derived(inferProcessorGen(deviceProductType));
-  // A6 devices can boot via kDFU as well (matches restore.sh's pwnDFU/kDFU options),
+  // A6 devices can boot via kDFU as well (matches the legacy pwnDFU/kDFU options),
   // so accept either pwnDFU or A6+kDFU as a valid boot state.
   let isBootableMode = $derived(
     deviceState.mode === 'pwnDFU' || (procGen === 6 && deviceState.mode === 'kDFU')

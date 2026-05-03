@@ -10,12 +10,22 @@ export function processorGenFromResponse(response: RestoreOptionsResponse): numb
 }
 
 /**
- * Infer processor generation from device product type.
+ * Infer processor generation from a device product type.
+ *
+ * The backend exposes processor generation only as a field on
+ * `RestoreOptionsResponse` (computed via `infer_processor_gen` in
+ * `src-tauri/src/services/device_meta.rs`); it is *not* present on
+ * `DeviceInfo` and is not exposed as a standalone IPC command. Therefore:
+ *
+ * - Views that already fetch restore options (e.g. `RestoreView.svelte`)
+ *   should prefer `processorGenFromResponse` to read the authoritative value.
+ * - Views/components that do not fetch restore options
+ *   (`JailbreakView`, `SSHRamdiskView`, `JustBootDialog`, `PwnDfuHelper`)
+ *   should call `inferProcessorGen` directly. This table is the canonical
+ *   frontend mirror of the Rust implementation; keep them in sync.
+ *
  * @param product - Apple device product identifier (e.g. "iPhone6,1")
  * @returns Processor generation number or null if unknown
- * @deprecated Use processorGenFromResponse with a RestoreOptionsResponse when available,
- *   as the backend already computes this value. This function remains for components
- *   that don't have access to restore options (e.g., JustBootDialog, PwnDfuHelper).
  */
 export function inferProcessorGen(product: string | null): number | null {
   if (!product) return null;

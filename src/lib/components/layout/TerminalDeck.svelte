@@ -54,6 +54,8 @@
         <span>Terminal Output</span>
       {:else}
         <svg
+          aria-hidden="true"
+          focusable="false"
           width="12"
           height="12"
           viewBox="0 0 24 24"

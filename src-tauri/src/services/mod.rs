@@ -5,6 +5,7 @@ pub mod device_parser;
 pub mod external_tools;
 pub mod ipsw_prep;
 pub mod just_boot_store;
+pub mod log_persist;
 pub mod restore_options;
 pub mod sha1;
 pub mod shsh_store;

@@ -154,6 +154,16 @@ pub fn run() {
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            // Initialize log persistence (best-effort, non-fatal on error).
+            match services::log_persist::init(app.handle()) {
+                Ok(path) => {
+                    eprintln!("[log_persist] Logging to {}", path.display());
+                }
+                Err(e) => {
+                    eprintln!("[log_persist] Failed to initialize: {}", e);
+                }
+            }
+
             #[cfg(target_os = "macos")]
             {
                 use tauri::Manager;
@@ -215,6 +225,7 @@ pub fn run() {
             commands::utilities::start_syslog,
             commands::utilities::stop_syslog,
             commands::utilities::syslog_status,
+            commands::utilities::get_log_file_path,
             commands::settings::get_app_settings,
             commands::settings::set_workspace_root,
             commands::settings::pick_workspace_root,

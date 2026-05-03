@@ -202,8 +202,9 @@ pub struct EnterPwnDfuResult {
 /// Picks the right pwn tool for `(processor_gen, os, arch, product_type)` and runs it,
 /// then verifies the result via `irecovery -q`.
 ///
-/// Mirrors `device_enter_mode pwnDFU` in `restore.sh`. Requires the device to already
-/// be in DFU mode — caller is responsible for that step (DfuHelper in the UI).
+/// Mirrors the `device_enter_mode pwnDFU` workflow from the legacy bash implementation.
+/// Requires the device to already be in DFU mode — caller is responsible for that step
+/// (DfuHelper in the UI).
 #[tauri::command]
 pub async fn enter_pwndfu(
     app: AppHandle,
@@ -334,7 +335,7 @@ pub struct DownloadPwnToolResult {
 
 /// Idempotently fetches an external pwn tool (kuroutadori → litera1n) into the
 /// workspace's `tools/` directory and returns the resolved binary path. Mirrors
-/// `kuroutadori_init` in `restore.sh:2405-2428`.
+/// the `kuroutadori_init` workflow from the legacy bash implementation.
 #[tauri::command]
 pub async fn download_pwn_tool(
     app: AppHandle,
@@ -351,7 +352,7 @@ pub async fn download_pwn_tool(
 }
 
 /// Pure tool-selection logic, factored out so it's testable without a Tauri app handle.
-/// Mirrors the cascade in `restore.sh:2236-2288`.
+/// Mirrors the pwn-tool cascade from the legacy bash implementation.
 fn pick_pwn_tool(
     proc_gen: u8,
     os: &str,
@@ -361,7 +362,7 @@ fn pick_pwn_tool(
     match proc_gen {
         4 => {
             let mut args = vec![];
-            // restore.sh: macOS-only --use-limera1n for the original A4 lineup.
+            // Legacy: macOS-only --use-limera1n for the original A4 lineup.
             if os == "macos"
                 && (product_type == "iPad1,1"
                     || product_type.starts_with("iPhone3,")
@@ -389,7 +390,7 @@ fn pick_pwn_tool(
                 label: "ipwnder",
             }),
             "linux" => {
-                // restore.sh:2247-2252 picks `a6meowing` for iPhone5,* on Linux, otherwise
+                // A6 on Linux: picks `a6meowing` for iPhone5,* on Linux, otherwise
                 // `litera1n` (from the kuroutadori bundle). a6meowing isn't fetched by this
                 // module yet — flag it explicitly until we ship it.
                 if product_type.starts_with("iPhone5,") {
@@ -412,7 +413,7 @@ fn pick_pwn_tool(
             ))),
         },
         7 => {
-            // restore.sh prefers ipwnder on macOS arm64 for A7; gaster everywhere else.
+            // A7: prefers ipwnder on macOS arm64; gaster everywhere else.
             if os == "macos" && arch == "aarch64" {
                 Ok(PwnPlan {
                     source: ToolSource::Bundled("ipwnder"),

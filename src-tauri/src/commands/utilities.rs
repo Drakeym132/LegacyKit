@@ -6,6 +6,7 @@ use crate::models::utilities::{
     SyslogStartRequest, SyslogStatusResult, UdidRequest,
 };
 use crate::platform::resolve_binary_path;
+use crate::services::log_persist;
 use crate::services::workspace;
 use crate::tools::util::{nullable, timestamp_dir_now};
 use std::fs;
@@ -403,4 +404,11 @@ fn emit_log_with_event(app: &AppHandle, event: &str, level: &str, text: &str) {
         kind: level.to_string(),
     };
     let _ = app.emit(event, payload);
+}
+
+/// Returns the path to the current log file for post-mortem inspection.
+#[tauri::command]
+pub async fn get_log_file_path(app: AppHandle) -> Result<String, AppError> {
+    let path = log_persist::get_log_file_path(&app)?;
+    Ok(path.to_string_lossy().to_string())
 }
