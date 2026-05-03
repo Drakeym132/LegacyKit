@@ -5,6 +5,7 @@
 *.ipa
 *.ipsw
 *.json
+!package.json
 *.shsh
 *.shsh2
 *.txt
