@@ -22,11 +22,6 @@ Out of scope:
 - Bundling or vendoring binaries into git
 - Windows support (not a current target)
 
-## Code of conduct
-
-Be respectful, be patient, and assume good faith. We're a small project; there
-isn't a formal CoC document, but reports of harassment will be taken seriously
-by the maintainers.
 
 ## Development setup
 
