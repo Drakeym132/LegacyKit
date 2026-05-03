@@ -4,7 +4,9 @@ use crate::services::{app_settings, workspace};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
+#[cfg(target_os = "macos")]
+use tauri::Manager;
 
 #[tauri::command]
 pub async fn get_app_settings(app: AppHandle) -> Result<AppSettings, AppError> {
