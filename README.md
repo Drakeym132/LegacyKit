@@ -21,8 +21,6 @@ mapping and a description of the shared on-disk workspace layout.
 Supported on **macOS** (x64 + arm64) and **Linux** (x64 + arm64). Windows is not
 currently a target.
 
-> 📸 **Screenshot coming soon** — UI walkthrough images will be added here once the v1.0 release is tagged.
-
 ## Features
 
 - **Restore / downgrade** flows for supported devices (signed OTA, blob-based,
@@ -219,16 +217,3 @@ project.
 
 LegacyKit is licensed under **GPL-3.0-or-later**. See [`LICENSE`](LICENSE:1) for
 the full text.
-
-## Acknowledgments
-
-LegacyKit stands on the shoulders of the iOS jailbreaking and restore community.
-The bundled sidecar tools — including but not limited to futurerestore,
-idevicerestore, libimobiledevice, gaster, ipwnder, tsschecker, ipsw, irecovery,
-img4tool, kloader, and the various ramdisk patch authors — are the work of many
-independent developers and research groups. Thank you to everyone who has kept
-legacy iOS devices usable.
-
-LegacyKit also gratefully acknowledges the Legacy iOS Kit bash project that
-preceded this UI, whose menus and workspace conventions informed the design of
-the new application.
