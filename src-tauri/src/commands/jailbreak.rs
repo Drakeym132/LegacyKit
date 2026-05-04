@@ -236,53 +236,102 @@ pub async fn enter_pwndfu(
     );
 
     let binary = resolve_pwn_tool(&app, &plan.source).await?;
-    crate::tools::runner::run_streaming(&app, binary.clone(), &plan.args)?;
 
-    if plan.run_gaster_reset {
-        if let Ok(gaster) = resolve_binary_path(&app, "gaster") {
-            crate::tools::runner::emit_log(&app, "info", "gaster reset");
-            // Reset is best-effort — non-zero exit shouldn't undo a successful pwn.
-            let _ = crate::tools::runner::run_streaming(&app, gaster, &["reset".to_string()]);
-        }
-    }
-
-    // Re-query irecovery to confirm the device is pwned. Capture stdout directly
-    // (the streaming runner only emits to the log channel).
-    let irecovery = resolve_binary_path(&app, "irecovery").map_err(AppError::CommandFailed)?;
-    let output = Command::new(&irecovery).arg("-q").output()?;
-    if !output.status.success() {
-        return Err(AppError::CommandFailed(format!(
-            "irecovery -q exited {} after pwn",
-            output.status
-        )));
-    }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let info = parse_irecovery_q(&stdout);
-
-    // The parser already encodes the pwn promotion rules (PWND non-empty for
-    // checkm8 tools, or SRTG="N/A" for A6/ipwnder). Trust its DeviceMode
-    // output here rather than re-deriving from raw fields.
-    let pwn_succeeded = matches!(info.mode, DeviceMode::PwnDFU);
-
-    if !pwn_succeeded {
-        return Err(AppError::CommandFailed(format!(
-            "Failed to enter pwnDFU using {}. Force-restart the device, re-enter DFU, and try again.",
-            plan.label
-        )));
-    }
-
-    if let Some(p) = info.pwnd.as_deref() {
-        crate::tools::runner::emit_log(&app, "info", &format!("Pwned: {p}"));
+    // checkm8-based tools (ipwnder, gaster) are timing-sensitive and may need retries.
+    // Retry up to 3 times for tools known to be checkm8-based.
+    let max_attempts = if plan.label == "ipwnder" || plan.label == "gaster" {
+        3
     } else {
-        crate::tools::runner::emit_log(&app, "info", "Found device in pwned iBSS mode.");
+        1
+    };
+
+    let mut last_error: Option<AppError> = None;
+
+    for attempt in 1..=max_attempts {
+        if attempt > 1 {
+            crate::tools::runner::emit_log(
+                &app,
+                "info",
+                &format!("Retrying {} (attempt {}/{})", plan.label, attempt, max_attempts),
+            );
+            // Small delay between retries to let USB settle
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+
+        // Run the pwn tool
+        if let Err(e) = crate::tools::runner::run_streaming(&app, binary.clone(), &plan.args) {
+            last_error = Some(e);
+            continue; // Try again on failure
+        }
+
+        if plan.run_gaster_reset {
+            if let Ok(gaster) = resolve_binary_path(&app, "gaster") {
+                crate::tools::runner::emit_log(&app, "info", "gaster reset");
+                // Reset is best-effort — non-zero exit shouldn't undo a successful pwn.
+                let _ = crate::tools::runner::run_streaming(&app, gaster, &["reset".to_string()]);
+            }
+        }
+
+        // Re-query irecovery to confirm the device is pwned. Capture stdout directly
+        // (the streaming runner only emits to the log channel).
+        let irecovery = resolve_binary_path(&app, "irecovery").map_err(AppError::CommandFailed)?;
+        let output = match Command::new(&irecovery).arg("-q").output() {
+            Ok(o) => o,
+            Err(e) => {
+                last_error = Some(AppError::from(e));
+                continue;
+            }
+        };
+
+        if !output.status.success() {
+            last_error = Some(AppError::CommandFailed(format!(
+                "irecovery -q exited {} after pwn",
+                output.status
+            )));
+            continue;
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let info = parse_irecovery_q(&stdout);
+
+        // The parser already encodes the pwn promotion rules (PWND non-empty for
+        // checkm8 tools, or SRTG="N/A" for A6/ipwnder). Trust its DeviceMode
+        // output here rather than re-deriving from raw fields.
+        let pwn_succeeded = matches!(info.mode, DeviceMode::PwnDFU);
+
+        if pwn_succeeded {
+            if let Some(p) = info.pwnd.as_deref() {
+                crate::tools::runner::emit_log(&app, "info", &format!("Pwned: {p}"));
+            } else {
+                crate::tools::runner::emit_log(&app, "info", "Found device in pwned iBSS mode.");
+            }
+
+            return Ok(EnterPwnDfuResult {
+                tool: plan.label.to_string(),
+                args: plan.args,
+                pwnd: info.pwnd,
+                mode: info.mode,
+            });
+        }
+
+        last_error = Some(AppError::CommandFailed(format!(
+            "{} did not produce pwnDFU state on attempt {}/{}",
+            plan.label, attempt, max_attempts
+        )));
     }
 
-    Ok(EnterPwnDfuResult {
-        tool: plan.label.to_string(),
-        args: plan.args,
-        pwnd: info.pwnd,
-        mode: info.mode,
-    })
+    // All attempts exhausted - return the last error or a generic failure
+    let err_msg = match last_error {
+        Some(e) => format!(
+            "Failed to enter pwnDFU after {} attempts with {}. Force-restart the device, re-enter DFU, and try again. Last error: {}",
+            max_attempts, plan.label, e
+        ),
+        None => format!(
+            "Failed to enter pwnDFU after {} attempts with {}. Force-restart the device, re-enter DFU, and try again.",
+            max_attempts, plan.label
+        ),
+    };
+    Err(AppError::CommandFailed(err_msg))
 }
 
 #[derive(Debug)]

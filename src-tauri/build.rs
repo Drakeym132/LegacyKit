@@ -61,6 +61,13 @@ fn is_executable(path: &std::path::Path) -> bool {
         return false;
     }
 
+    // Skip .DS_Store and other hidden files
+    if let Some(name) = path.file_name() {
+        if name.to_string_lossy().starts_with('.') {
+            return false;
+        }
+    }
+
     // Check if any execute bit is set
     if let Ok(metadata) = fs::metadata(path) {
         let mode = metadata.permissions().mode();

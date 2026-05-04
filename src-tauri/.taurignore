@@ -1,0 +1,16 @@
+# Tauri dev watcher ignore patterns
+# Prevents automatic rebuilds when these files change
+
+# macOS folder metadata
+.DS_Store
+**/.DS_Store
+
+# Build artifacts
+target/
+binaries/
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo

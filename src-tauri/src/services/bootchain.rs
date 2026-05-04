@@ -284,7 +284,27 @@ fn patch_iboot32(
         "info",
         &format!("Patching iBoot -> {}", output.to_string_lossy()),
     );
-    crate::tools::runner::run_streaming(app, binary, &args)
+
+    // Run the patcher - some iBoot32Patcher builds return exit code 1 even on success,
+    // so we check for output file existence rather than relying solely on exit code.
+    let result = crate::tools::runner::run_streaming(app, binary, &args);
+
+    // If the command failed but the output file exists with non-zero size, consider it success.
+    // This handles quirky iBoot32Patcher builds that write valid output but return non-zero.
+    if result.is_err() && output.exists() {
+        if let Ok(metadata) = std::fs::metadata(output) {
+            if metadata.len() > 0 {
+                crate::tools::runner::emit_log(
+                    app,
+                    "info",
+                    "iBoot32Patcher returned non-zero but output file exists - treating as success",
+                );
+                return Ok(());
+            }
+        }
+    }
+
+    result
 }
 
 /// Packs a binary into IMG4 format.
