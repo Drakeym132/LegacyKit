@@ -288,6 +288,9 @@
       const result = await enterPwndfu({ productType: deviceProductType });
       deviceStore.optimisticallySetMode(result.mode, result.pwnd);
       toastStore.success('pwnDFU entered', `via ${result.tool}`);
+      // Boost polling so the next detect_device runs immediately with fresh
+      // pwnDFU state instead of potentially stale DFU from before the exploit.
+      settingsStore.boostPolling();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       errorMessage = msg;

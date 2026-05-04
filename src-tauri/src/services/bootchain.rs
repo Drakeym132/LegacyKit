@@ -1,8 +1,23 @@
 use crate::error::AppError;
 use crate::platform::resolve_binary_path;
+use crate::services::firmware_keys::{fetch_firmware_keys, get_component_keys};
 use std::fs::{self, File};
+use std::io::Read;
 use std::path::Path;
 use tauri::AppHandle;
+
+/// Checks if a file has img3 container magic bytes.
+/// img3 magic is "3gmI" (little-endian) = bytes 0x33 0x67 0x6d 0x49.
+fn is_img3_container(path: &Path) -> bool {
+    let mut buf = [0u8; 4];
+    if let Ok(mut f) = File::open(path) {
+        if f.read(&mut buf).is_ok() {
+            // img3 magic is "3gmI" in little-endian
+            return buf == [0x33, 0x67, 0x6d, 0x49];
+        }
+    }
+    false
+}
 
 #[derive(Debug, Clone)]
 pub struct PreparedBootchain {
@@ -10,13 +25,15 @@ pub struct PreparedBootchain {
     pub repacked_ibec_path: Option<String>,
 }
 
-pub fn prepare_cached_bootchain(
+pub async fn prepare_cached_bootchain(
     app: &AppHandle,
     ipsw_path: &str,
     cache_dir: &Path,
     boot_args: &str,
     use_img4: bool,
     include_ibec: bool,
+    product_type: &str,
+    build_id: &str,
 ) -> Result<(PreparedBootchain, bool), AppError> {
     let cached_ibss = cache_dir.join("iBSS.repacked");
     let cached_ibec = cache_dir.join("iBEC.repacked");
@@ -73,24 +90,103 @@ pub fn prepare_cached_bootchain(
         None
     };
 
-    let ibss_patched = work_dir.join("iBSS.patched");
-    patch_iboot32(app, &ibss_extracted, &ibss_patched, boot_args)?;
-    let ibec_patched = if let Some(extracted) = ibec_extracted.as_ref() {
-        let path = work_dir.join("iBEC.patched");
-        patch_iboot32(app, extracted, &path, boot_args)?;
-        Some(path)
+    // Fetch firmware keys if we're dealing with img3 containers (A4-A6 devices)
+    let needs_keys = !use_img4
+        && (is_img3_container(&ibss_extracted)
+            || ibec_extracted
+                .as_ref()
+                .is_some_and(|p| is_img3_container(p)));
+
+    if needs_keys {
+        crate::tools::runner::emit_log(
+            app,
+            "info",
+            &format!(
+                "Detected img3 containers, fetching firmware keys for {product_type} {build_id}"
+            ),
+        );
+        fetch_firmware_keys(app, product_type, build_id).await?;
+    }
+
+    // Process iBSS
+    let (ibss_patched, ibss_template) = if use_img4 {
+        // A7+ devices use img4: just patch directly
+        let patched = work_dir.join("iBSS.patched");
+        patch_iboot32(app, &ibss_extracted, &patched, boot_args)?;
+        (patched, None)
+    } else if is_img3_container(&ibss_extracted) {
+        // A4-A6 devices with img3: decrypt -> strip -> patch -> repack with template
+        let keys = get_component_keys(product_type, build_id, "iBSS").ok_or_else(|| {
+            AppError::CommandFailed(format!(
+                "No firmware keys found for iBSS ({product_type} {build_id})"
+            ))
+        })?;
+
+        let ibss_decrypted = work_dir.join("iBSS.decrypted");
+        decrypt_img3(app, &ibss_extracted, &ibss_decrypted, &keys.iv, &keys.key)?;
+
+        let ibss_stripped = work_dir.join("iBSS.stripped");
+        strip_img3_wrapper(app, &ibss_decrypted, &ibss_stripped)?;
+
+        let ibss_patched = work_dir.join("iBSS.patched");
+        patch_iboot32(app, &ibss_stripped, &ibss_patched, boot_args)?;
+
+        (ibss_patched, Some(ibss_decrypted))
     } else {
-        None
+        // Already decrypted (rare case)
+        let patched = work_dir.join("iBSS.patched");
+        patch_iboot32(app, &ibss_extracted, &patched, boot_args)?;
+        (patched, None)
     };
 
+    // Process iBEC if needed
+    let (ibec_patched, ibec_template) = if let Some(extracted) = ibec_extracted.as_ref() {
+        if use_img4 {
+            let patched = work_dir.join("iBEC.patched");
+            patch_iboot32(app, extracted, &patched, boot_args)?;
+            (Some(patched), None)
+        } else if is_img3_container(extracted) {
+            let keys = get_component_keys(product_type, build_id, "iBEC").ok_or_else(|| {
+                AppError::CommandFailed(format!(
+                    "No firmware keys found for iBEC ({product_type} {build_id})"
+                ))
+            })?;
+
+            let ibec_decrypted = work_dir.join("iBEC.decrypted");
+            decrypt_img3(app, extracted, &ibec_decrypted, &keys.iv, &keys.key)?;
+
+            let ibec_stripped = work_dir.join("iBEC.stripped");
+            strip_img3_wrapper(app, &ibec_decrypted, &ibec_stripped)?;
+
+            let ibec_patched = work_dir.join("iBEC.patched");
+            patch_iboot32(app, &ibec_stripped, &ibec_patched, boot_args)?;
+
+            (Some(ibec_patched), Some(ibec_decrypted))
+        } else {
+            let patched = work_dir.join("iBEC.patched");
+            patch_iboot32(app, extracted, &patched, boot_args)?;
+            (Some(patched), None)
+        }
+    } else {
+        (None, None)
+    };
+
+    // Repack components
     if use_img4 {
         pack_img4(app, &ibss_patched, &cached_ibss)?;
         if let Some(ibec) = ibec_patched.as_ref() {
             pack_img4(app, ibec, &cached_ibec)?;
         }
     } else {
-        repack_img3(app, &ibss_patched, &cached_ibss)?;
-        if let Some(ibec) = ibec_patched.as_ref() {
+        // For img3, repack with template for proper signing
+        if let Some(template) = ibss_template.as_ref() {
+            repack_img3_with_template(app, &ibss_patched, &cached_ibss, template)?;
+        } else {
+            repack_img3(app, &ibss_patched, &cached_ibss)?;
+        }
+        if let (Some(ibec), Some(template)) = (ibec_patched.as_ref(), ibec_template.as_ref()) {
+            repack_img3_with_template(app, ibec, &cached_ibec, template)?;
+        } else if let Some(ibec) = ibec_patched.as_ref() {
             repack_img3(app, ibec, &cached_ibec)?;
         }
     }
@@ -127,6 +223,48 @@ pub fn run_kloader_with_paths(
     crate::tools::runner::run_streaming(app, binary, &args)
 }
 
+/// Decrypts an img3 file using xpwntool with IV and key.
+fn decrypt_img3(
+    app: &AppHandle,
+    input: &Path,
+    output: &Path,
+    iv: &str,
+    key: &str,
+) -> Result<(), AppError> {
+    let binary = resolve_binary_path(app, "xpwntool").map_err(AppError::CommandFailed)?;
+    let args = vec![
+        input.to_string_lossy().to_string(),
+        output.to_string_lossy().to_string(),
+        "-iv".to_string(),
+        iv.to_string(),
+        "-k".to_string(),
+        key.to_string(),
+        "-decrypt".to_string(),
+    ];
+    crate::tools::runner::emit_log(
+        app,
+        "info",
+        &format!("Decrypting img3 -> {}", output.to_string_lossy()),
+    );
+    crate::tools::runner::run_streaming(app, binary, &args)
+}
+
+/// Strips img3 wrapper to get raw iBoot binary.
+fn strip_img3_wrapper(app: &AppHandle, input: &Path, output: &Path) -> Result<(), AppError> {
+    let binary = resolve_binary_path(app, "xpwntool").map_err(AppError::CommandFailed)?;
+    let args = vec![
+        input.to_string_lossy().to_string(),
+        output.to_string_lossy().to_string(),
+    ];
+    crate::tools::runner::emit_log(
+        app,
+        "info",
+        &format!("Stripping img3 wrapper -> {}", output.to_string_lossy()),
+    );
+    crate::tools::runner::run_streaming(app, binary, &args)
+}
+
+/// Patches iBoot32 binary with custom boot arguments.
 fn patch_iboot32(
     app: &AppHandle,
     input: &Path,
@@ -149,6 +287,7 @@ fn patch_iboot32(
     crate::tools::runner::run_streaming(app, binary, &args)
 }
 
+/// Packs a binary into IMG4 format.
 fn pack_img4(app: &AppHandle, input: &Path, output: &Path) -> Result<(), AppError> {
     let binary = resolve_binary_path(app, "img4tool").map_err(AppError::CommandFailed)?;
     let args = vec![
@@ -165,6 +304,7 @@ fn pack_img4(app: &AppHandle, input: &Path, output: &Path) -> Result<(), AppErro
     crate::tools::runner::run_streaming(app, binary, &args)
 }
 
+/// Repacks a binary into img3 format (without template).
 fn repack_img3(app: &AppHandle, input: &Path, output: &Path) -> Result<(), AppError> {
     let binary = resolve_binary_path(app, "xpwntool").map_err(AppError::CommandFailed)?;
     let args = vec![
@@ -175,6 +315,31 @@ fn repack_img3(app: &AppHandle, input: &Path, output: &Path) -> Result<(), AppEr
         app,
         "info",
         &format!("Repacking IMG3 -> {}", output.to_string_lossy()),
+    );
+    crate::tools::runner::run_streaming(app, binary, &args)
+}
+
+/// Repacks a binary into img3 format using a template for proper structure.
+fn repack_img3_with_template(
+    app: &AppHandle,
+    input: &Path,
+    output: &Path,
+    template: &Path,
+) -> Result<(), AppError> {
+    let binary = resolve_binary_path(app, "xpwntool").map_err(AppError::CommandFailed)?;
+    let args = vec![
+        input.to_string_lossy().to_string(),
+        output.to_string_lossy().to_string(),
+        "-t".to_string(),
+        template.to_string_lossy().to_string(),
+    ];
+    crate::tools::runner::emit_log(
+        app,
+        "info",
+        &format!(
+            "Repacking IMG3 with template -> {}",
+            output.to_string_lossy()
+        ),
     );
     crate::tools::runner::run_streaming(app, binary, &args)
 }

@@ -83,7 +83,18 @@ pub async fn prepare_and_just_boot(
         .as_deref()
         .and_then(normalize_generation)
         .or_else(|| infer_processor_generation(&product_type));
-    let use_img4 = proc_gen.map(|value| value >= 6).unwrap_or(true);
+    // img4 starts at A7; A4–A6 devices use img3 containers
+    let use_img4 = proc_gen.map(|value| value >= 7).unwrap_or(true);
+
+    crate::tools::runner::emit_log(
+        &app,
+        "info",
+        &format!(
+            "Processor generation: {:?}, using {} format",
+            proc_gen,
+            if use_img4 { "img4" } else { "img3" }
+        ),
+    );
 
     let cache_root = app
         .path()
@@ -111,7 +122,10 @@ pub async fn prepare_and_just_boot(
         &boot_args,
         use_img4,
         request.include_ibec,
-    )?;
+        &product_type,
+        &build_id,
+    )
+    .await?;
 
     let now = Utc::now().to_rfc3339();
     let draft = JustBootEntry {

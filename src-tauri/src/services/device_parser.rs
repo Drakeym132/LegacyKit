@@ -81,9 +81,27 @@ pub fn parse_irecovery_q(stdout: &str) -> DeviceInfo {
         }
     }
 
+    let saw_mode_dfu = matches!(info.mode, DeviceMode::DFU);
+    let has_non_empty_pwnd = info.pwnd.as_deref().is_some_and(|s| !s.is_empty());
+
     // PWND is only emitted by irecovery once a checkm8-style exploit has run,
     // so its presence promotes "DFU" to "pwnDFU".
-    if matches!(info.mode, DeviceMode::DFU) && info.pwnd.as_deref().is_some_and(|s| !s.is_empty()) {
+    if saw_mode_dfu && has_non_empty_pwnd {
+        info.mode = DeviceMode::PwnDFU;
+    }
+
+    // A6 devices (ipwnder) report pwned iBSS via SRTG rather than PWND.
+    // Unpwned A6 DFU shows SRTG like "iBoot-1145.3.3" or "[iBoot-1940.10]";
+    // after a successful ipwnder exploit, SRTG becomes "N/A". Only promote
+    // when SRTG is explicitly absent/N/A (the pwn signal), NOT just any
+    // non-iBoot string, to avoid false positives on unpwned devices.
+    if saw_mode_dfu
+        && !has_non_empty_pwnd
+        && info
+            .srtg
+            .as_deref()
+            .is_some_and(|s| s.eq_ignore_ascii_case("N/A"))
+    {
         info.mode = DeviceMode::PwnDFU;
     }
 
@@ -177,6 +195,37 @@ SRTG: [iBoot-1940.10]
     #[test]
     fn parse_irecovery_q_dfu_with_empty_pwnd_stays_dfu() {
         let out = "MODE: DFU\nPWND:\n";
+        let info = parse_irecovery_q(out);
+        assert!(matches!(info.mode, DeviceMode::DFU));
+    }
+
+    #[test]
+    fn parse_irecovery_q_a6_pwndfu_via_srtg() {
+        // A6 devices (ipwnder) report pwned iBSS via SRTG="N/A" rather than PWND
+        let out = r#"ECID: 0x00000301b418b38a
+CPID: 0x8955
+BDID: 0x00
+MODE: DFU
+PRODUCT: iPad3,4
+SRTG: N/A
+"#;
+        let info = parse_irecovery_q(out);
+        assert!(matches!(info.mode, DeviceMode::PwnDFU));
+        assert_eq!(info.srtg.as_deref(), Some("N/A"));
+    }
+
+    #[test]
+    fn parse_irecovery_q_dfu_with_iboot_srtg_stays_dfu() {
+        // Unpwned A6 (real irecovery output: no brackets)
+        let out = "MODE: DFU\nSRTG: iBoot-1145.3.3\n";
+        let info = parse_irecovery_q(out);
+        assert!(matches!(info.mode, DeviceMode::DFU));
+    }
+
+    #[test]
+    fn parse_irecovery_q_dfu_with_bracketed_iboot_srtg_stays_dfu() {
+        // Unpwned A6 (alternate bracketed form)
+        let out = "MODE: DFU\nSRTG: [iBoot-1940.10]\n";
         let info = parse_irecovery_q(out);
         assert!(matches!(info.mode, DeviceMode::DFU));
     }

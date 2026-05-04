@@ -257,15 +257,12 @@ pub async fn enter_pwndfu(
         )));
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut info = parse_irecovery_q(&stdout);
+    let info = parse_irecovery_q(&stdout);
 
-    let pwn_succeeded = info.pwnd.as_deref().is_some_and(|s| !s.is_empty())
-        || (proc_gen == 6
-            && matches!(info.mode, DeviceMode::DFU)
-            && info
-                .srtg
-                .as_deref()
-                .is_some_and(|s| !s.starts_with("[iBoot")));
+    // The parser already encodes the pwn promotion rules (PWND non-empty for
+    // checkm8 tools, or SRTG="N/A" for A6/ipwnder). Trust its DeviceMode
+    // output here rather than re-deriving from raw fields.
+    let pwn_succeeded = matches!(info.mode, DeviceMode::PwnDFU);
 
     if !pwn_succeeded {
         return Err(AppError::CommandFailed(format!(
@@ -278,13 +275,6 @@ pub async fn enter_pwndfu(
         crate::tools::runner::emit_log(&app, "info", &format!("Pwned: {p}"));
     } else {
         crate::tools::runner::emit_log(&app, "info", "Found device in pwned iBSS mode.");
-    }
-
-    // For A6 devices, the pwn is indicated by SRTG (pwned iBSS) rather than PWND field.
-    // If we detected a successful pwn via the pwn_succeeded check above but PWND is empty,
-    // explicitly promote DFU → pwnDFU so the mode reflects the actual state.
-    if matches!(info.mode, DeviceMode::DFU) && proc_gen == 6 && info.pwnd.is_none() {
-        info.mode = DeviceMode::PwnDFU;
     }
 
     Ok(EnterPwnDfuResult {
