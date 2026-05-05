@@ -7,7 +7,7 @@ use crate::services::external_tools::{ensure_pwn_tool, ExternalTool};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,25 +59,29 @@ pub async fn run_gaster(app: AppHandle, request: GasterRequest) -> Result<Gaster
     })
 }
 
+/// Request for sending bootchain components to a device in pwnDFU mode.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct KloaderRequest {
+pub struct SendBootchainRequest {
+    /// Path to the patched iBSS file
     pub ibss_path: String,
+    /// Optional path to the patched iBEC file
     pub ibec_path: Option<String>,
+    /// Processor generation (e.g., 6 for A6). Used to determine if gaster reset is needed.
+    pub processor_generation: Option<u8>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct KloaderResult {
-    pub binary: String,
-    pub args: Vec<String>,
-}
-
+/// Sends patched iBSS/iBEC to a device in pwnDFU mode using irecovery.
+/// This is the correct flow for tethered boot from pwnDFU.
+///
+/// Note: The old `run_kloader` command was incorrectly trying to run kloader
+/// as a host binary. kloader is an ARM binary that runs ON the iOS device,
+/// not on the host computer. For pwnDFU boot, we use irecovery -f instead.
 #[tauri::command]
-pub async fn run_kloader(
+pub async fn send_bootchain(
     app: AppHandle,
-    request: KloaderRequest,
-) -> Result<KloaderResult, AppError> {
+    request: SendBootchainRequest,
+) -> Result<(), AppError> {
     let ibss_path = request.ibss_path.trim();
     if ibss_path.is_empty() {
         return Err(AppError::Parse("Patched iBSS path is required".to_string()));
@@ -101,27 +105,52 @@ pub async fn run_kloader(
         }
     }
 
-    let mut args = vec![ibss_path.to_string()];
-    if let Some(ibec) = ibec_path {
-        args.push(ibec.to_string());
-    }
-
-    let binary = resolve_binary_path(&app, "kloader").map_err(AppError::CommandFailed)?;
-    crate::tools::runner::emit_log(
+    // Delegate to the shared helper so both this command and
+    // `prepare_and_just_boot` execute the exact same sequence (gaster reset on
+    // A6 -> irecovery -f iBSS -> irecovery -f iBEC -> setenv auto-boot true ->
+    // saveenv -> fsboot). Without the post-iBEC commands the device just sits
+    // at iBEC's recovery prompt instead of finishing the boot, which looks
+    // identical to "stuck in recovery mode" from the host.
+    crate::services::bootchain::send_bootchain_pwndfu(
         &app,
-        "info",
-        &format!(
-            "Booting patched components with kloader: {}",
-            args.join(" ")
-        ),
-    );
-    crate::tools::runner::run_streaming(&app, binary.clone(), &args)?;
-    crate::tools::runner::emit_log(&app, "info", "kloader finished");
+        ibss_path,
+        ibec_path,
+        request.processor_generation,
+    )
+}
 
-    Ok(KloaderResult {
-        binary: binary.to_string_lossy().to_string(),
-        args,
-    })
+// Legacy types kept for backwards compatibility with any frontend code
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KloaderRequest {
+    pub ibss_path: String,
+    pub ibec_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KloaderResult {
+    pub binary: String,
+    pub args: Vec<String>,
+}
+
+/// DEPRECATED: Use `send_bootchain` instead.
+///
+/// This command was incorrectly trying to run kloader as a host binary.
+/// kloader is an ARM binary that runs ON the iOS device, not on the host.
+/// Kept for backwards compatibility but will return an error directing users
+/// to use the correct flow.
+#[tauri::command]
+pub async fn run_kloader(
+    _app: AppHandle,
+    _request: KloaderRequest,
+) -> Result<KloaderResult, AppError> {
+    Err(AppError::Parse(
+        "run_kloader is deprecated. kloader is an ARM binary that runs on the iOS device, \
+         not on the host. Use send_bootchain for pwnDFU tethered boot, or use the kDFU flow \
+         for jailbroken devices with SSH access."
+            .to_string(),
+    ))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -558,4 +587,155 @@ mod tests {
             assert_bundled(&plan, "gaster");
         }
     }
+}
+
+// ============================================================================
+// kDFU Mode Support (for jailbroken devices with SSH access)
+// ============================================================================
+
+/// kloader variant selection for kDFU mode.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum KloaderVariant {
+    /// Standard kloader for iOS 6+
+    Standard,
+    /// kloader5 for iPad 3 on iOS 5
+    Kloader5,
+    /// kloader_axi0mX for iOS ≤5 devices
+    Axi0mX,
+}
+
+impl KloaderVariant {
+    pub fn resource_name(&self) -> &'static str {
+        match self {
+            KloaderVariant::Standard => "kloader",
+            KloaderVariant::Kloader5 => "kloader5",
+            KloaderVariant::Axi0mX => "kloader_axi0mX",
+        }
+    }
+    
+    /// Select the appropriate kloader variant based on iOS version and device type.
+    pub fn select(ios_major: u8, product_type: &str) -> Self {
+        if ios_major <= 5 {
+            // iPad 3 on iOS 5 needs kloader5
+            if matches!(product_type, "iPad2,4" | "iPad3,1" | "iPad3,2" | "iPad3,3") {
+                KloaderVariant::Kloader5
+            } else {
+                KloaderVariant::Axi0mX
+            }
+        } else {
+            KloaderVariant::Standard
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetKloaderPathRequest {
+    /// The kloader variant to get
+    pub variant: KloaderVariant,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetKloaderPathResult {
+    /// Path to the kloader binary in the app's resources
+    pub path: String,
+    /// The variant that was resolved
+    pub variant: KloaderVariant,
+}
+
+/// Returns the path to a kloader binary in the app's resources.
+///
+/// IMPORTANT: kloader is an ARM binary that runs ON the iOS device, not on the host.
+/// This command returns the path so the frontend can send it to the device via SSH.
+///
+/// The kDFU flow requires:
+/// 1. Device must be jailbroken with OpenSSH (or Dropbear on iOS 10) installed
+/// 2. Frontend uses SSH/SCP to send kloader + patched iBSS to /tmp on device
+/// 3. Frontend runs kloader via SSH: `/tmp/kloader /tmp/pwnediBSS`
+/// 4. Device enters kDFU mode (software-based DFU)
+#[tauri::command]
+pub async fn get_kloader_path(
+    app: AppHandle,
+    request: GetKloaderPathRequest,
+) -> Result<GetKloaderPathResult, AppError> {
+    let resource_path = app
+        .path()
+        .resource_dir()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to get resource dir: {}", e)))?;
+    
+    let kloader_name = request.variant.resource_name();
+    let path = resource_path.join("kloader").join(kloader_name);
+    
+    if !path.exists() {
+        return Err(AppError::CommandFailed(format!(
+            "kloader variant '{}' not found at {}",
+            kloader_name,
+            path.display()
+        )));
+    }
+    
+    Ok(GetKloaderPathResult {
+        path: path.to_string_lossy().to_string(),
+        variant: request.variant,
+    })
+}
+
+/// Instructions for entering kDFU mode from a jailbroken device.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KdfuInstructions {
+    /// Path to the kloader binary (send to device via SCP)
+    pub kloader_path: String,
+    /// Path to the patched iBSS file (send to device via SCP)
+    pub ibss_path: String,
+    /// SSH command to run kloader on the device
+    pub ssh_command: String,
+    /// The kloader variant used
+    pub kloader_variant: KloaderVariant,
+}
+
+/// Returns instructions for entering kDFU mode from a jailbroken device.
+///
+/// Prerequisites:
+/// - Device must be jailbroken with OpenSSH installed
+/// - Device must be in Normal mode with SSH accessible
+/// - For iOS 10, Dropbear must be installed instead of OpenSSH
+#[tauri::command]
+pub async fn get_kdfu_instructions(
+    app: AppHandle,
+    ibss_path: String,
+    ios_major: u8,
+    product_type: String,
+    ssh_port: Option<u16>,
+) -> Result<KdfuInstructions, AppError> {
+    // Validate iBSS exists
+    if !Path::new(&ibss_path).exists() {
+        return Err(AppError::Parse(format!(
+            "Patched iBSS does not exist: {}",
+            ibss_path
+        )));
+    }
+    
+    // Select appropriate kloader variant
+    let variant = KloaderVariant::select(ios_major, &product_type);
+    
+    // Get kloader path
+    let kloader_result = get_kloader_path(app, GetKloaderPathRequest {
+        variant: variant.clone(),
+    }).await?;
+    
+    let port = ssh_port.unwrap_or(22);
+    let ssh_command = format!(
+        "ssh -p {} root@127.0.0.1 'chmod +x /tmp/kloader /tmp/pwnediBSS && /tmp/kloader /tmp/pwnediBSS'",
+        port
+    );
+    
+    Ok(KdfuInstructions {
+        kloader_path: kloader_result.path,
+        ibss_path,
+        ssh_command,
+        kloader_variant: variant,
+    })
 }

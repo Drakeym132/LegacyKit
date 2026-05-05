@@ -61,7 +61,6 @@ The following binaries are expected by the codebase. Obtain them from the projec
 | `futurerestore_new` | Restore with custom SHSH blobs | [`commands/restore.rs`](../src-tauri/src/commands/restore.rs:501) | futurerestore project |
 | `gaster` | checkm8 exploit + pwnDFU operations | [`commands/jailbreak.rs`](../src-tauri/src/commands/jailbreak.rs:47) | Upstream community tool |
 | `ipwnder` | checkm8 pwnDFU for A6-A7 (macOS) | [`commands/jailbreak.rs`](../src-tauri/src/commands/jailbreak.rs:386) | Upstream community tool (macOS only) |
-| `kloader` | Load kernels over USB | [`commands/jailbreak.rs`](../src-tauri/src/commands/jailbreak.rs:112), [`services/bootchain.rs`](../src-tauri/src/services/bootchain.rs:116) | Upstream community tool |
 | `irecovery` | Interact with Recovery/DFU mode | [`commands/jailbreak.rs`](../src-tauri/src/commands/jailbreak.rs:250), [`commands/utilities.rs`](../src-tauri/src/commands/utilities.rs:40), [`commands/device.rs`](../src-tauri/src/commands/device.rs:20) | libimobiledevice project |
 | `ideviceinfo` | Query device properties | [`commands/device.rs`](../src-tauri/src/commands/device.rs:10), [`commands/utilities.rs`](../src-tauri/src/commands/utilities.rs:170) | libimobiledevice project |
 | `ideviceinstaller` | Install/uninstall IPA apps | [`commands/apps.rs`](../src-tauri/src/commands/apps.rs:16) | libimobiledevice project |
@@ -71,6 +70,23 @@ The following binaries are expected by the codebase. Obtain them from the projec
 | `idevicepair` | Manage device pairings | [`commands/utilities.rs`](../src-tauri/src/commands/utilities.rs:84) | libimobiledevice project |
 | `ideviceactivation` | Activate device | [`commands/utilities.rs`](../src-tauri/src/commands/utilities.rs:112) | libimobiledevice project |
 | `idevicesyslog` | Stream device syslog | [`commands/utilities.rs`](../src-tauri/src/commands/utilities.rs:316) | libimobiledevice project |
+
+## Device-side binaries (NOT host tools)
+
+The following binaries are **ARM executables that run on the iOS device itself**, not on the host computer. They are stored in `resources/kloader/` and are sent to the device via SSH when needed:
+
+| Binary | Purpose | When used |
+|--------|---------|-----------|
+| `kloader` | Load kernels over USB on iOS 6+ | kDFU mode (entering DFU from jailbroken device via SSH) |
+| `kloader5` | Load kernels on iOS 5 | kDFU mode for iPad 3 on iOS 5 |
+| `kloader_axi0mX` | Alternative kloader for older iOS | kDFU mode for iOS ≤5 devices |
+
+**IMPORTANT**: These are NOT host-side sidecar binaries. Do not place them in `src-tauri/binaries/`. They are bundled as app resources in `resources/kloader/` and are sent to the device via SSH when entering kDFU mode from a jailbroken state.
+
+### kDFU vs pwnDFU boot flows
+
+- **pwnDFU tethered boot**: Uses `irecovery -f` to send patched iBSS/iBEC directly. This is the correct flow for A6+ devices in pwnDFU mode.
+- **kDFU mode**: Requires the device to be jailbroken with SSH access. The kloader binary is sent to the device and executed there to enter a software-based DFU mode.
 
 ## Per-platform notes
 

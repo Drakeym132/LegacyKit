@@ -143,17 +143,19 @@ pub async fn prepare_and_just_boot(
         last_booted_at: now,
     };
 
-    let kloader_result = bootchain::run_kloader_with_paths(
+    // Send the bootchain via irecovery (correct for pwnDFU mode)
+    let boot_result = bootchain::send_bootchain_pwndfu(
         &app,
         draft
             .repacked_ibss_path
             .as_deref()
             .ok_or_else(|| AppError::Parse("Missing repacked iBSS path".to_string()))?,
         draft.repacked_ibec_path.as_deref(),
+        proc_gen,
     );
 
     let stored = just_boot_store::upsert(&app, draft)?;
-    match kloader_result {
+    match boot_result {
         Ok(_) => Ok(stored),
         Err(err) => Err(err),
     }

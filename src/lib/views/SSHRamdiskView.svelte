@@ -8,7 +8,7 @@
     repackImg3,
     type IbootBitWidth,
   } from '$lib/api/firmware';
-  import { runKloader } from '$lib/api/jailbreak';
+  import { sendBootchain } from '$lib/api/jailbreak';
   import { recordJustBoot } from '$lib/api/justBoot';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { settingsStore } from '$lib/stores/settingsStore.svelte';
@@ -197,8 +197,8 @@
       }
     }
 
-    await work.run('Booting via kloader', () =>
-      runKloader({ ibssPath: patchedIbss, ibecPath: patchedIbec || null })
+    await work.run('Booting via irecovery', () =>
+      sendBootchain({ ibssPath: patchedIbss, ibecPath: patchedIbec || null, processorGeneration: processorGen })
     );
   }
 </script>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { runKloader } from '../../api/jailbreak';
+  import { sendBootchain } from '../../api/jailbreak';
   import {
     listJustBootHistory, 
     recordJustBoot, 
@@ -130,9 +130,10 @@
     logStore.append(`${label}...`, 'info');
     
     try {
-      await runKloader({ 
-        ibssPath: heroEntry.repackedIbssPath, 
-        ibecPath: heroEntry.repackedIbecPath 
+      await sendBootchain({
+        ibssPath: heroEntry.repackedIbssPath,
+        ibecPath: heroEntry.repackedIbecPath,
+        processorGeneration: procGen
       });
       
       // Update last booted time
@@ -174,9 +175,10 @@
     logStore.append(`${label}...`, 'info');
     
     try {
-      await runKloader({ 
-        ibssPath: entry.repackedIbssPath, 
-        ibecPath: entry.repackedIbecPath 
+      await sendBootchain({
+        ibssPath: entry.repackedIbssPath,
+        ibecPath: entry.repackedIbecPath,
+        processorGeneration: procGen
       });
       
       // Update last booted time

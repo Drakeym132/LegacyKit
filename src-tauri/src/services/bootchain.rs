@@ -4,7 +4,7 @@ use crate::services::firmware_keys::{fetch_firmware_keys, get_component_keys};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::Path;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 /// Checks if a file has img3 container magic bytes.
 /// img3 magic is "3gmI" (little-endian) = bytes 0x33 0x67 0x6d 0x49.
@@ -202,25 +202,124 @@ pub async fn prepare_cached_bootchain(
     ))
 }
 
-pub fn run_kloader_with_paths(
+/// Sends patched iBSS/iBEC to a device in pwnDFU mode using irecovery.
+/// This is the correct flow for A6 and later devices when booting from pwnDFU.
+///
+/// The flow is:
+/// 1. For A6 devices: gaster reset (to clear the pwned state)
+/// 2. irecovery -f <ibss> (send patched iBSS)
+/// 3. irecovery -f <ibec> (send patched iBEC, if provided)
+///
+/// Note: kloader is NOT used here - it's an ARM binary that runs on the iOS device,
+/// not a host-side tool. kloader is only used for kDFU mode (entering DFU from a
+/// jailbroken device via SSH).
+pub fn send_bootchain_pwndfu(
     app: &AppHandle,
     ibss_path: &str,
     ibec_path: Option<&str>,
+    processor_gen: Option<u8>,
 ) -> Result<(), AppError> {
-    let mut args = vec![ibss_path.to_string()];
-    if let Some(ibec) = ibec_path {
-        args.push(ibec.to_string());
+    let irecovery = resolve_binary_path(app, "irecovery").map_err(AppError::CommandFailed)?;
+
+    // For A6 devices, we need to reset gaster first
+    if processor_gen == Some(6) {
+        let gaster = resolve_binary_path(app, "gaster").map_err(AppError::CommandFailed)?;
+        crate::tools::runner::emit_log(app, "info", "Resetting gaster for A6 device...");
+        crate::tools::runner::run_streaming(app, gaster, &["reset".to_string()])?;
+        // Small delay to let the device settle
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
-    let binary = resolve_binary_path(app, "kloader").map_err(AppError::CommandFailed)?;
+
+    // Send iBSS
     crate::tools::runner::emit_log(
         app,
         "info",
-        &format!(
-            "Booting patched components with kloader: {}",
-            args.join(" ")
-        ),
+        &format!("Sending patched iBSS via irecovery: {}", ibss_path),
     );
-    crate::tools::runner::run_streaming(app, binary, &args)
+    crate::tools::runner::run_streaming(
+        app,
+        irecovery.clone(),
+        &["-f".to_string(), ibss_path.to_string()],
+    )?;
+
+    // Small delay between iBSS and iBEC
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    // Send iBEC if provided
+    if let Some(ibec) = ibec_path {
+        crate::tools::runner::emit_log(
+            app,
+            "info",
+            &format!("Sending patched iBEC via irecovery: {}", ibec),
+        );
+        crate::tools::runner::run_streaming(
+            app,
+            irecovery.clone(),
+            &["-f".to_string(), ibec.to_string()],
+        )?;
+
+        // After iBEC is loaded it sits at its own recovery prompt waiting for input.
+        // Without an explicit boot command iBEC just stays there and the device
+        // appears to be "stuck in recovery" from the host's perspective.
+        //
+        // Sequence (matches the bash legacy `just boot` flow):
+        //   1. setenv auto-boot true   – ensure iBoot will continue past recovery on next reset
+        //   2. saveenv                 – persist the env var
+        //   3. fsboot                  – tell iBEC to boot the OS from NAND
+        //
+        // Wait a moment so iBEC's USB recovery interface has time to come up before
+        // we start issuing -c commands; otherwise the first command can race the
+        // re-enumeration and silently drop.
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+
+        let post_ibec_cmds: &[&str] = &["setenv auto-boot true", "saveenv", "fsboot"];
+        for cmd in post_ibec_cmds {
+            crate::tools::runner::emit_log(
+                app,
+                "info",
+                &format!("irecovery -c \"{}\"", cmd),
+            );
+            crate::tools::runner::run_streaming(
+                app,
+                irecovery.clone(),
+                &["-c".to_string(), (*cmd).to_string()],
+            )?;
+            std::thread::sleep(std::time::Duration::from_millis(250));
+        }
+    }
+
+    crate::tools::runner::emit_log(app, "info", "Bootchain sent successfully");
+    Ok(())
+}
+
+/// Resource path resolver for kloader variants.
+/// Returns the path to the kloader binary in the app's resources directory.
+///
+/// IMPORTANT: kloader is an ARM binary that runs ON the iOS device, not on the host.
+/// It is used for kDFU mode (entering DFU from a jailbroken device via SSH).
+/// The caller is responsible for sending this binary to the device via SSH.
+pub fn get_kloader_resource_path(app: &AppHandle, variant: &str) -> Result<std::path::PathBuf, AppError> {
+    let resource_path = app
+        .path()
+        .resource_dir()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to get resource dir: {}", e)))?;
+    
+    let kloader_name = match variant {
+        "kloader5" => "kloader5",
+        "kloader_axi0mX" => "kloader_axi0mX",
+        _ => "kloader",
+    };
+    
+    let path = resource_path.join("kloader").join(kloader_name);
+    if path.exists() {
+        Ok(path)
+    } else {
+        Err(AppError::CommandFailed(format!(
+            "kloader variant '{}' not found at {}",
+            kloader_name,
+            path.display()
+        )))
+    }
 }
 
 /// Decrypts an img3 file using xpwntool with IV and key.
