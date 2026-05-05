@@ -52,3 +52,4 @@ npm-debug.log*
 # --- OS cruft ---
 .DS_Store
 Thumbs.db
+docs/JUST-BOOT-FIX.md
