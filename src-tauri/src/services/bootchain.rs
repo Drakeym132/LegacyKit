@@ -31,7 +31,6 @@ pub async fn prepare_cached_bootchain(
     cache_dir: &Path,
     boot_args: &str,
     use_img4: bool,
-    include_ibec: bool,
     product_type: &str,
     build_id: &str,
 ) -> Result<(PreparedBootchain, bool), AppError> {
