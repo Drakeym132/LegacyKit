@@ -30,6 +30,8 @@ pub async fn record_just_boot(
         boot_args: entry.boot_args,
         repacked_ibss_path: entry.repacked_ibss_path,
         repacked_ibec_path: entry.repacked_ibec_path,
+        decrypted_devicetree_path: entry.decrypted_devicetree_path,
+        decrypted_kernelcache_path: entry.decrypted_kernelcache_path,
         source_ipsw_path: entry.source_ipsw_path,
         created_at: now.clone(),
         last_booted_at: now,
@@ -78,11 +80,8 @@ pub async fn prepare_and_just_boot(
         .unwrap_or("pio-error=0 -v")
         .to_string();
 
-    let proc_gen = request
-        .processor_generation
-        .as_deref()
-        .and_then(normalize_generation)
-        .or_else(|| infer_processor_generation(&product_type));
+    // Auto-detect processor generation from product_type
+    let proc_gen = infer_processor_generation(&product_type);
     // img4 starts at A7; A4–A6 devices use img3 containers
     let use_img4 = proc_gen.map(|value| value >= 7).unwrap_or(true);
 
@@ -115,13 +114,14 @@ pub async fn prepare_and_just_boot(
         ),
     );
 
+    // Prepare the bootchain (iBSS, iBEC, DeviceTree, Kernelcache)
+    // Note: include_ibec is auto-determined from build_id and product_type
     let (prepared, _) = bootchain::prepare_cached_bootchain(
         &app,
         &ipsw_path,
         &cache_dir,
         &boot_args,
         use_img4,
-        request.include_ibec,
         &product_type,
         &build_id,
     )
@@ -136,14 +136,17 @@ pub async fn prepare_and_just_boot(
         build_id,
         ios_version: request.ios_version,
         boot_args: Some(boot_args),
-        repacked_ibss_path: Some(prepared.repacked_ibss_path),
-        repacked_ibec_path: prepared.repacked_ibec_path,
+        repacked_ibss_path: Some(prepared.repacked_ibss_path.clone()),
+        repacked_ibec_path: prepared.repacked_ibec_path.clone(),
+        decrypted_devicetree_path: prepared.decrypted_devicetree_path.clone(),
+        decrypted_kernelcache_path: prepared.decrypted_kernelcache_path.clone(),
         source_ipsw_path: Some(ipsw_path),
         created_at: now.clone(),
         last_booted_at: now,
     };
 
     // Send the bootchain via irecovery (correct for pwnDFU mode)
+    // The new sequence: iBSS -> iBEC -> DeviceTree -> devicetree -> Kernelcache -> bootx
     let boot_result = bootchain::send_bootchain_pwndfu(
         &app,
         draft
@@ -151,6 +154,8 @@ pub async fn prepare_and_just_boot(
             .as_deref()
             .ok_or_else(|| AppError::Parse("Missing repacked iBSS path".to_string()))?,
         draft.repacked_ibec_path.as_deref(),
+        draft.decrypted_devicetree_path.as_deref(),
+        draft.decrypted_kernelcache_path.as_deref(),
         proc_gen,
     );
 
@@ -173,11 +178,6 @@ fn normalize_ecid(value: &str) -> String {
         .trim_start_matches("0x")
         .trim_start_matches("0X")
         .to_ascii_lowercase()
-}
-
-fn normalize_generation(value: &str) -> Option<u8> {
-    let lower = value.trim().to_ascii_lowercase();
-    lower.strip_prefix('a')?.parse::<u8>().ok()
 }
 
 fn infer_processor_generation(product_type: &str) -> Option<u8> {

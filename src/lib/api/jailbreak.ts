@@ -46,25 +46,29 @@ export function runKloader(request: KloaderRequest): Promise<KloaderResult> {
 
 /**
  * Request for sending bootchain components to a device in pwnDFU mode.
- * Uses irecovery -f to send patched iBSS/iBEC files.
+ * Uses irecovery -f to send patched iBSS/iBEC and decrypted DeviceTree/Kernelcache.
  */
 export interface SendBootchainRequest {
   /** Path to the patched iBSS file */
   ibssPath: string;
   /** Optional path to the patched iBEC file */
   ibecPath: string | null;
+  /** Optional path to the decrypted DeviceTree file */
+  deviceTreePath?: string | null;
+  /** Optional path to the decrypted Kernelcache file */
+  kernelcachePath?: string | null;
   /** Processor generation (e.g., 6 for A6). Used to determine if gaster reset is needed. */
   processorGeneration: number | null;
 }
 
 /**
- * Sends patched iBSS/iBEC to a device in pwnDFU mode using irecovery.
- * This is the correct flow for tethered boot from pwnDFU.
+ * Sends patched iBSS/iBEC and decrypted DeviceTree/Kernelcache to a device
+ * in pwnDFU mode using irecovery. This is the correct flow for tethered boot.
  *
  * For A6 devices, this will also reset gaster before sending the bootchain.
- * After iBEC is delivered, the backend issues `setenv auto-boot true`,
- * `saveenv`, and `fsboot` so the device actually proceeds out of iBEC's
- * recovery prompt and into the OS.
+ * After iBEC is delivered the backend waits for USB re-enumeration into
+ * recovery PID 0x1281, then stages DeviceTree (`devicetree`) and Kernelcache
+ * (`bootx`) so the device boots into the OS.
  */
 export function sendBootchain(request: SendBootchainRequest): Promise<void> {
   return invoke<void>('send_bootchain', { request });

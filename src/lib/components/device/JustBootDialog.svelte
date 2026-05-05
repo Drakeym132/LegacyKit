@@ -1,9 +1,9 @@
 <script lang="ts">
   import { sendBootchain } from '../../api/jailbreak';
   import {
-    listJustBootHistory, 
-    recordJustBoot, 
-    forgetJustBoot, 
+    listJustBootHistory,
+    recordJustBoot,
+    forgetJustBoot,
     prepareAndJustBoot,
     type JustBootEntry,
     type PrepareAndJustBootRequest
@@ -29,42 +29,37 @@
   let errorMessage = $state<string | null>(null);
   let isLoadingHistory = $state(false);
 
-  // Form states for new build section
+  // Form state for new build section
   let ipswPath = $state('');
   let buildId = $state('');
   let iosVersion = $state('');
-  let includeIbec = $state(true);
   let bootArgs = $state('');
-  let showAdvanced = $state(false);
 
   // Device state
   let deviceState = $derived(deviceStore.state);
   let deviceEcid = $derived(deviceState.ecid);
   let deviceProductType = $derived(deviceState.product_type);
   let procGen = $derived(inferProcessorGen(deviceProductType));
-  // A6 devices can boot via kDFU as well (matches the legacy pwnDFU/kDFU options),
-  // so accept either pwnDFU or A6+kDFU as a valid boot state.
+  // A6 devices can boot via kDFU as well, so accept either pwnDFU or A6+kDFU.
   let isBootableMode = $derived(
     deviceState.mode === 'pwnDFU' || (procGen === 6 && deviceState.mode === 'kDFU')
   );
 
-  // History filtering
+  // Hero entry: connected device's ECID, all four bootchain paths present.
   let heroEntry = $derived<JustBootEntry | null>(
-    deviceEcid ? history.find(entry => 
-      entry.ecid === deviceEcid && 
-      entry.repackedIbssPath !== null
+    deviceEcid ? history.find(entry =>
+      entry.ecid === deviceEcid &&
+      entry.repackedIbssPath !== null &&
+      entry.decryptedDevicetreePath !== null &&
+      entry.decryptedKernelcachePath !== null
     ) ?? null : null
   );
 
-  let thisDeviceEntries = $derived(
-    history.filter(entry => 
-      entry.productType === deviceProductType && 
-      entry !== heroEntry
-    )
-  );
-
-  let otherDeviceEntries = $derived(
-    history.filter(entry => entry.productType !== deviceProductType)
+  // Flat list of all other entries, newest-first.
+  let allOtherEntries = $derived(
+    history
+      .filter(entry => entry !== heroEntry)
+      .sort((a, b) => new Date(b.lastBootedAt).getTime() - new Date(a.lastBootedAt).getTime())
   );
 
   function formatRelativeTime(dateString: string): string {
@@ -82,14 +77,9 @@
     return date.toLocaleDateString();
   }
 
-  function updateIncludeIbecDefault() {
-    const gen = inferProcessorGen(deviceProductType);
-    includeIbec = gen !== null && gen >= 6;
-  }
-
   async function loadHistory() {
     if (!isOpen) return;
-    
+
     isLoadingHistory = true;
     errorMessage = null;
     try {
@@ -128,15 +118,16 @@
     errorMessage = null;
     const label = `Booting iOS ${heroEntry.iosVersion ?? '?'} (${heroEntry.buildId})`;
     logStore.append(`${label}...`, 'info');
-    
+
     try {
       await sendBootchain({
         ibssPath: heroEntry.repackedIbssPath,
         ibecPath: heroEntry.repackedIbecPath,
+        deviceTreePath: heroEntry.decryptedDevicetreePath,
+        kernelcachePath: heroEntry.decryptedKernelcachePath,
         processorGeneration: procGen
       });
-      
-      // Update last booted time
+
       await recordJustBoot({
         ecid: heroEntry.ecid,
         productType: heroEntry.productType,
@@ -146,6 +137,8 @@
         bootArgs: heroEntry.bootArgs,
         repackedIbssPath: heroEntry.repackedIbssPath,
         repackedIbecPath: heroEntry.repackedIbecPath,
+        decryptedDevicetreePath: heroEntry.decryptedDevicetreePath,
+        decryptedKernelcachePath: heroEntry.decryptedKernelcachePath,
         sourceIpswPath: heroEntry.sourceIpswPath
       });
 
@@ -162,10 +155,55 @@
     }
   }
 
+  /**
+   * Re-prepares a history entry using its saved sourceIpswPath, then boots.
+   * Called when a history entry is missing DT/KC paths (old cache entries).
+   */
+  async function handleReprepAndBoot(entry: JustBootEntry) {
+    if (!entry.sourceIpswPath) {
+      errorMessage = 'No source IPSW path available for re-preparation. Select an IPSW manually.';
+      return;
+    }
+
+    isWorking = true;
+    errorMessage = null;
+    const label = `Re-preparing and booting iOS ${entry.iosVersion ?? '?'} (${entry.buildId})`;
+    logStore.append(`${label}...`, 'info');
+
+    try {
+      await prepareAndJustBoot({
+        ecid: entry.ecid,
+        productType: entry.productType,
+        deviceName: entry.deviceName,
+        buildId: entry.buildId,
+        iosVersion: entry.iosVersion,
+        ipswPath: entry.sourceIpswPath,
+        bootArgs: entry.bootArgs
+      });
+
+      await loadHistory();
+      logStore.append(`${label} ok`, 'info');
+      toastStore.success('Boot successful', 'Device should now be booting');
+      onClose();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      errorMessage = msg;
+      logStore.append(`${label} failed: ${msg}`, 'stderr');
+      toastStore.error('Boot failed', msg);
+    } finally {
+      isWorking = false;
+    }
+  }
+
   async function handleHistoryBoot(entry: JustBootEntry) {
-    if (!entry.repackedIbssPath) return;
     if (!isBootableMode) {
       errorMessage = 'Device must be in pwnDFU mode before booting';
+      return;
+    }
+
+    // Guard: if any required bootchain path is missing, re-prep transparently.
+    if (!entry.repackedIbssPath || !entry.decryptedDevicetreePath || !entry.decryptedKernelcachePath) {
+      await handleReprepAndBoot(entry);
       return;
     }
 
@@ -173,15 +211,16 @@
     errorMessage = null;
     const label = `Booting iOS ${entry.iosVersion ?? '?'} (${entry.buildId})`;
     logStore.append(`${label}...`, 'info');
-    
+
     try {
       await sendBootchain({
         ibssPath: entry.repackedIbssPath,
         ibecPath: entry.repackedIbecPath,
+        deviceTreePath: entry.decryptedDevicetreePath,
+        kernelcachePath: entry.decryptedKernelcachePath,
         processorGeneration: procGen
       });
-      
-      // Update last booted time
+
       await recordJustBoot({
         ecid: entry.ecid,
         productType: entry.productType,
@@ -191,6 +230,8 @@
         bootArgs: entry.bootArgs,
         repackedIbssPath: entry.repackedIbssPath,
         repackedIbecPath: entry.repackedIbecPath,
+        decryptedDevicetreePath: entry.decryptedDevicetreePath,
+        decryptedKernelcachePath: entry.decryptedKernelcachePath,
         sourceIpswPath: entry.sourceIpswPath
       });
 
@@ -221,7 +262,7 @@
     errorMessage = null;
     const label = `Preparing and booting ${buildId}`;
     logStore.append(`${label}...`, 'info');
-    
+
     try {
       const request: PrepareAndJustBootRequest = {
         ecid: deviceEcid || '',
@@ -230,12 +271,11 @@
         buildId: buildId.trim(),
         iosVersion: iosVersion.trim() || null,
         ipswPath: ipswPath.trim(),
-        bootArgs: bootArgs.trim() || null,
-        includeIbec
+        bootArgs: bootArgs.trim() || null
       };
 
       await prepareAndJustBoot(request);
-      
+
       logStore.append(`${label} ok`, 'info');
       toastStore.success('Boot successful', 'Device should now be booting');
       onClose();
@@ -274,7 +314,6 @@
   $effect(() => {
     if (isOpen) {
       loadHistory();
-      updateIncludeIbecDefault();
       void maybeAutoEnterPwndfu();
     }
   });
@@ -305,10 +344,6 @@
       autoPwnAttempted = false;
     }
   });
-
-  $effect(() => {
-    updateIncludeIbecDefault();
-  });
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -325,7 +360,7 @@
       onkeydown={(e) => e.stopPropagation()}
     >
       <h3 id="just-boot-title">Just Boot</h3>
-      
+
       <!-- Device Summary -->
       {#if deviceState.connected}
         <div class="device-summary">
@@ -344,7 +379,7 @@
         <PwnDfuHelper />
       {/if}
 
-      <!-- Hero Card - Boot last build -->
+      <!-- Hero Card - Boot last cached build for connected device -->
       {#if heroEntry}
         <div class="hero-card">
           <div class="hero-header">
@@ -356,15 +391,15 @@
               <span class="ios-version">iOS {heroEntry.iosVersion ?? '?'} ({heroEntry.buildId})</span>
             </div>
             <div class="hero-actions">
-              <button 
-                class="primary large" 
+              <button
+                class="primary large"
                 onclick={handleHeroBoot}
                 disabled={isWorking || !isBootableMode}
               >
                 {isWorking ? 'Booting…' : 'Boot'}
               </button>
-              <button 
-                class="secondary small" 
+              <button
+                class="secondary small"
                 onclick={() => handleForget(heroEntry)}
                 disabled={isWorking}
               >
@@ -375,110 +410,40 @@
         </div>
       {/if}
 
-      <!-- Boot History -->
+      <!-- Boot History - flat list, sorted newest-first -->
       <div class="history-section">
         <h4>Boot history</h4>
-        
+
         {#if isLoadingHistory}
           <div class="loading">Loading history...</div>
-        {:else if history.length === 0}
+        {:else if allOtherEntries.length === 0 && !heroEntry}
           <div class="empty-state">No boot history found</div>
         {:else}
-          <!-- This Device entries -->
-          {#if thisDeviceEntries.length > 0}
-            <div class="history-group">
-              <h5>This device</h5>
-              {#each thisDeviceEntries as entry}
-                <div class="history-item">
-                  <div class="item-info">
-                    <span class="device-name">{entry.deviceName || entry.productType}</span>
-                    <span class="build-info">iOS {entry.iosVersion ?? '?'} ({entry.buildId})</span>
-                    <span class="last-booted">{formatRelativeTime(entry.lastBootedAt)}</span>
-                  </div>
-                  <div class="item-actions">
-                    {#if entry.repackedIbssPath}
-                      <button 
-                        class="primary small"
-                        onclick={() => handleHistoryBoot(entry)}
-                        disabled={isWorking || !isBootableMode}
-                      >
-                        Boot
-                      </button>
-                    {:else}
-                      <button 
-                        class="secondary small"
-                        onclick={() => {
-                          ipswPath = entry.sourceIpswPath || '';
-                          buildId = entry.buildId;
-                          iosVersion = entry.iosVersion || '';
-                        }}
-                        disabled={isWorking}
-                      >
-                        Prepare
-                      </button>
-                    {/if}
-                    <button 
-                      class="secondary small"
-                      onclick={() => handleForget(entry)}
-                      disabled={isWorking}
-                    >
-                      Forget
-                    </button>
-                  </div>
-                </div>
-              {/each}
+          {#each allOtherEntries as entry}
+            <div class="history-item">
+              <div class="item-info">
+                <span class="device-name">{entry.deviceName || entry.productType}</span>
+                <span class="build-info">iOS {entry.iosVersion ?? '?'} ({entry.buildId})</span>
+                <span class="last-booted">{formatRelativeTime(entry.lastBootedAt)}</span>
+              </div>
+              <div class="item-actions">
+                <button
+                  class="primary small"
+                  onclick={() => handleHistoryBoot(entry)}
+                  disabled={isWorking || !isBootableMode}
+                >
+                  Boot
+                </button>
+                <button
+                  class="secondary small"
+                  onclick={() => handleForget(entry)}
+                  disabled={isWorking}
+                >
+                  Forget
+                </button>
+              </div>
             </div>
-          {/if}
-
-          <!-- Other Devices entries -->
-          {#if otherDeviceEntries.length > 0}
-            <details class="history-group">
-              <summary>
-                <h5>Other devices</h5>
-                <span class="count">{otherDeviceEntries.length}</span>
-              </summary>
-              {#each otherDeviceEntries as entry}
-                <div class="history-item">
-                  <div class="item-info">
-                    <span class="device-name">{entry.deviceName || entry.productType}</span>
-                    <span class="build-info">iOS {entry.iosVersion ?? '?'} ({entry.buildId})</span>
-                    <span class="last-booted">{formatRelativeTime(entry.lastBootedAt)}</span>
-                  </div>
-                  <div class="item-actions">
-                    {#if entry.repackedIbssPath}
-                      <button 
-                        class="primary small"
-                        onclick={() => handleHistoryBoot(entry)}
-                        disabled={isWorking || !isBootableMode}
-                        title={!isBootableMode ? 'Connect this device to boot' : ''}
-                      >
-                        Boot
-                      </button>
-                    {:else}
-                      <button 
-                        class="secondary small"
-                        onclick={() => {
-                          ipswPath = entry.sourceIpswPath || '';
-                          buildId = entry.buildId;
-                          iosVersion = entry.iosVersion || '';
-                        }}
-                        disabled={isWorking}
-                      >
-                        Prepare
-                      </button>
-                    {/if}
-                    <button 
-                      class="secondary small"
-                      onclick={() => handleForget(entry)}
-                      disabled={isWorking}
-                    >
-                      Forget
-                    </button>
-                  </div>
-                </div>
-              {/each}
-            </details>
-          {/if}
+          {/each}
         {/if}
       </div>
 
@@ -487,7 +452,7 @@
         <summary>
           <h4>Boot a different build</h4>
         </summary>
-        
+
         <div class="form-section">
           <label class="field">
             <span>IPSW path</span>
@@ -507,29 +472,20 @@
             <input bind:value={iosVersion} placeholder="e.g. 9.3.5" disabled={isWorking} />
           </label>
 
-          <label class="checkbox">
-            <input type="checkbox" bind:checked={includeIbec} disabled={isWorking} />
-            <span>Include patched iBEC</span>
+          <label class="field">
+            <span>Custom boot-args</span>
+            <input bind:value={bootArgs} placeholder="pio-error=0 -v" disabled={isWorking} />
           </label>
-
-          <details class="advanced-section" bind:open={showAdvanced}>
-            <summary>Advanced</summary>
-            
-            <label class="field">
-              <span>Custom boot-args</span>
-              <input bind:value={bootArgs} placeholder="pio-error=0 -v" disabled={isWorking} />
-            </label>
-            <p class="advanced-note">
-              Repacked bootchain files are resolved and cached automatically under the configured workspace.
-            </p>
-          </details>
+          <p class="advanced-note">
+            Repacked bootchain files are resolved and cached automatically under the configured workspace.
+          </p>
 
           {#if errorMessage}
             <div class="error">{errorMessage}</div>
           {/if}
 
           <div class="actions">
-            <button 
+            <button
               class="primary"
               onclick={handlePrepareAndBoot}
               disabled={isWorking || !isBootableMode || !ipswPath.trim() || !buildId.trim()}
@@ -557,7 +513,7 @@
     z-index: 999;
     padding: 16px;
   }
-  
+
   .dialog {
     background: var(--color-bg-primary);
     color: var(--color-text-primary);
@@ -573,23 +529,16 @@
     gap: var(--spacing-md);
   }
 
-  h3 { 
-    margin: 0; 
-    font-size: 1.125rem; 
+  h3 {
+    margin: 0;
+    font-size: 1.125rem;
     font-weight: 600;
   }
 
-  h4 { 
-    margin: 0; 
-    font-size: 1rem; 
+  h4 {
+    margin: 0;
+    font-size: 1rem;
     font-weight: 600;
-  }
-
-  h5 { 
-    margin: 0; 
-    font-size: 0.875rem; 
-    font-weight: 600;
-    color: var(--color-text-secondary);
   }
 
   .device-summary {
@@ -668,32 +617,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
-  }
-
-  .history-group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-  }
-
-  .history-group summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    padding: var(--spacing-xs) 0;
-  }
-
-  .history-group summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .count {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    background: var(--color-bg-secondary);
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
   }
 
   .history-item {
@@ -788,30 +711,6 @@
 
   .field input:disabled {
     opacity: 0.6;
-  }
-
-  .checkbox {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.8125rem;
-  }
-
-  .checkbox input {
-    margin: 0;
-  }
-
-  .advanced-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-xs);
-  }
-
-  .advanced-section summary {
-    cursor: pointer;
-    color: var(--color-text-secondary);
-    font-size: 0.8125rem;
   }
 
   .advanced-note {

@@ -67,6 +67,10 @@ pub struct SendBootchainRequest {
     pub ibss_path: String,
     /// Optional path to the patched iBEC file
     pub ibec_path: Option<String>,
+    /// Path to the decrypted DeviceTree file (required for just boot)
+    pub device_tree_path: Option<String>,
+    /// Path to the decrypted Kernelcache file (required for just boot)
+    pub kernelcache_path: Option<String>,
     /// Processor generation (e.g., 6 for A6). Used to determine if gaster reset is needed.
     pub processor_generation: Option<u8>,
 }
@@ -74,9 +78,16 @@ pub struct SendBootchainRequest {
 /// Sends patched iBSS/iBEC to a device in pwnDFU mode using irecovery.
 /// This is the correct flow for tethered boot from pwnDFU.
 ///
-/// Note: The old `run_kloader` command was incorrectly trying to run kloader
-/// as a host binary. kloader is an ARM binary that runs ON the iOS device,
-/// not on the host computer. For pwnDFU boot, we use irecovery -f instead.
+/// The sequence for just boot is:
+/// 1. For A6 devices: gaster reset
+/// 2. irecovery -f <ibss>
+/// 3. Sleep 500ms
+/// 4. irecovery -f <ibec> (if provided)
+/// 5. Sleep 1500ms (wait for USB re-enumeration)
+/// 6. irecovery -f <devicetree>
+/// 7. irecovery -c "devicetree"
+/// 8. irecovery -f <kernelcache>
+/// 9. irecovery -c "bootx"
 #[tauri::command]
 pub async fn send_bootchain(
     app: AppHandle,
@@ -105,16 +116,40 @@ pub async fn send_bootchain(
         }
     }
 
-    // Delegate to the shared helper so both this command and
-    // `prepare_and_just_boot` execute the exact same sequence (gaster reset on
-    // A6 -> irecovery -f iBSS -> irecovery -f iBEC -> setenv auto-boot true ->
-    // saveenv -> fsboot). Without the post-iBEC commands the device just sits
-    // at iBEC's recovery prompt instead of finishing the boot, which looks
-    // identical to "stuck in recovery mode" from the host.
+    let device_tree_path = request
+        .device_tree_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    if let Some(dt) = device_tree_path {
+        if !Path::new(dt).exists() {
+            return Err(AppError::Parse(format!(
+                "DeviceTree does not exist: {dt}"
+            )));
+        }
+    }
+
+    let kernelcache_path = request
+        .kernelcache_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    if let Some(kc) = kernelcache_path {
+        if !Path::new(kc).exists() {
+            return Err(AppError::Parse(format!(
+                "Kernelcache does not exist: {kc}"
+            )));
+        }
+    }
+
+    // Delegate to the shared helper which implements the correct boot sequence:
+    // iBSS -> iBEC -> DeviceTree -> devicetree command -> Kernelcache -> bootx command
     crate::services::bootchain::send_bootchain_pwndfu(
         &app,
         ibss_path,
         ibec_path,
+        device_tree_path,
+        kernelcache_path,
         request.processor_generation,
     )
 }

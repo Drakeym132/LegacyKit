@@ -10,6 +10,8 @@ export interface JustBootEntry {
   bootArgs: string | null;
   repackedIbssPath: string | null;
   repackedIbecPath: string | null;
+  decryptedDevicetreePath: string | null;
+  decryptedKernelcachePath: string | null;
   sourceIpswPath: string | null;
   createdAt: string;
   lastBootedAt: string;
@@ -24,6 +26,8 @@ export interface JustBootEntryInput {
   bootArgs?: string | null;
   repackedIbssPath?: string | null;
   repackedIbecPath?: string | null;
+  decryptedDevicetreePath?: string | null;
+  decryptedKernelcachePath?: string | null;
   sourceIpswPath?: string | null;
 }
 
@@ -35,8 +39,6 @@ export interface PrepareAndJustBootRequest {
   iosVersion?: string | null;
   ipswPath: string;
   bootArgs?: string | null;
-  processorGeneration?: string | null;
-  includeIbec: boolean;
 }
 
 export function listJustBootHistory(): Promise<JustBootEntry[]> {

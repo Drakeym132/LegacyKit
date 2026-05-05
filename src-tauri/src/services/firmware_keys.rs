@@ -253,7 +253,7 @@ fn parse_applewiki_html(
     // Parse component keys from HTML using regex-like extraction
     // The HTML contains patterns like: id="keypage-ibss-iv">VALUE</code>
     // and id="keypage-ibss-key">VALUE</code>
-    for component in ["iBSS", "iBEC", "iBoot", "LLB", "Kernelcache", "RecoveryMode"] {
+    for component in ["iBSS", "iBEC", "iBoot", "LLB", "Kernelcache", "RecoveryMode", "DeviceTree"] {
         let iv_pattern = format!(r#"id="keypage-{}-iv">([a-f0-9]{{32}})</code>"#, component.to_lowercase());
         let key_pattern = format!(r#"id="keypage-{}-key">([a-f0-9]{{64}})</code>"#, component.to_lowercase());
 
