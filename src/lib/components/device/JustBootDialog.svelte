@@ -16,6 +16,21 @@
   import { enterPwndfu } from '../../api/jailbreak';
   import PwnDfuHelper from './PwnDfuHelper.svelte';
   import { open as openDialog } from '@tauri-apps/plugin-dialog';
+  import { fade, scale } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
+
+  function portal(node: HTMLElement) {
+    const original = node.parentNode;
+    const next = node.nextSibling;
+    document.body.appendChild(node);
+    return {
+      destroy() {
+        if (original && node.parentNode === document.body) {
+          original.insertBefore(node, next);
+        }
+      }
+    };
+  }
 
   interface Props {
     open: boolean;
@@ -315,6 +330,11 @@
     if (isOpen) {
       loadHistory();
       void maybeAutoEnterPwndfu();
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prev;
+      };
     }
   });
 
@@ -349,7 +369,13 @@
 <svelte:window onkeydown={onKey} />
 
 {#if isOpen}
-  <div class="overlay" role="presentation" onclick={handleClose}>
+  <div
+    class="overlay"
+    role="presentation"
+    onclick={handleClose}
+    use:portal
+    transition:fade={{ duration: 150 }}
+  >
     <div
       class="dialog"
       role="dialog"
@@ -358,8 +384,13 @@
       aria-labelledby="just-boot-title"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      transition:scale={{ duration: 180, start: 0.96, easing: cubicOut }}
     >
-      <h3 id="just-boot-title">Just Boot</h3>
+      <header class="dialog-header">
+        <h3 id="just-boot-title">Just Boot</h3>
+      </header>
+
+      <div class="dialog-body">
 
       <!-- Device Summary -->
       {#if deviceState.connected}
@@ -496,9 +527,11 @@
         </div>
       </details>
 
-      <div class="footer-actions">
-        <button class="secondary" onclick={handleClose} disabled={isWorking}>Cancel</button>
       </div>
+
+      <footer class="dialog-footer">
+        <button class="secondary" onclick={handleClose} disabled={isWorking}>Cancel</button>
+      </footer>
     </div>
   </div>
 {/if}
@@ -511,7 +544,7 @@
     display: grid;
     place-items: center;
     z-index: 999;
-    padding: 16px;
+    padding: clamp(8px, 2vh, 16px);
   }
 
   .dialog {
@@ -519,14 +552,43 @@
     color: var(--color-text-primary);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
     width: min(600px, 100%);
-    max-height: 80vh;
-    overflow-y: auto;
+    max-height: min(calc(100vh - 32px), 720px);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .dialog-header {
+    padding: clamp(12px, 2.5vh, 24px) clamp(12px, 2.5vh, 24px) 0;
+  }
+
+  .dialog-body {
+    padding: clamp(8px, 1.5vh, 16px) clamp(12px, 2.5vh, 24px);
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(8px, 1.5vh, 16px);
+  }
+
+  .dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) clamp(12px, 2.5vh, 24px);
+    border-top: 1px solid var(--color-border);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .overlay,
+    .dialog {
+      transition: none !important;
+      animation: none !important;
+    }
   }
 
   h3 {
@@ -734,15 +796,6 @@
     justify-content: flex-end;
     gap: var(--spacing-sm);
     margin-top: var(--spacing-xs);
-  }
-
-  .footer-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-md);
-    padding-top: var(--spacing-md);
-    border-top: 1px solid var(--color-border);
   }
 
   button {
