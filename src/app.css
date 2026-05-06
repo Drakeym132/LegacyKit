@@ -27,10 +27,14 @@
   /* Borders */
   --color-border: #D2D2D7;
   
-  /* Geometry */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  /* Geometry — radii are tuned to step up gracefully toward the window's
+   * --shell-radius (28px). Tiles use --radius-md, mid-level cards use
+   * --radius-lg, and panel containers use --radius-xl, so visually nested
+   * surfaces never look sharper than the window that contains them. */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
   
   /* Spacing */
   --spacing-xs: 4px;
@@ -56,10 +60,46 @@
    * and content panels. Use a soft gradient so glass translucency has depth. */
   --shell-bg: radial-gradient(120% 120% at 20% 20%, #ffffff 0%, #f5f5f7 35%, #ececf0 100%);
   --shell-radius: 28px;
-  --content-radius: 20px;
+  --content-radius: 22px;
   --content-border: 1px solid var(--color-border);
-  --content-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.18),
-                    0 2px 6px -2px rgba(0, 0, 0, 0.10);
+
+  /* Liquid-glass bezel — a stack of inset highlights + a soft drop shadow
+   * that gives any rounded surface the look of a piece of frosted glass
+   * picking up an overhead light source.
+   *
+   *   1. inset top hairline    : the overhead "lit edge"
+   *   2. inset full hairline   : a faint refractive rim around the whole shape
+   *   3. inset bottom shadow   : a subtle floor shadow inside the surface so
+   *                              the bezel doesn't read as flat
+   *   4. outer ambient shadow  : grounds the surface against its backdrop
+   *   5. outer contact shadow  : tightens the contact line on the bottom edge
+   *
+   * Tokens are token-driven; theme + glass-chrome blocks below override the
+   * RGBA mixes so the bezel looks correct on any background.
+   */
+  --bezel-highlight: rgba(255, 255, 255, 0.55);
+  --bezel-rim: rgba(255, 255, 255, 0.18);
+  --bezel-floor: rgba(0, 0, 0, 0.03);
+  --bezel-ambient: rgba(0, 0, 0, 0.05);
+  --bezel-contact: rgba(0, 0, 0, 0.03);
+  --bezel-shadow:
+    inset 0 1px 0 var(--bezel-highlight),
+    inset 0 0 0 1px var(--bezel-rim),
+    inset 0 -1px 0 var(--bezel-floor),
+    0 6px 18px -14px var(--bezel-ambient),
+    0 1px 3px -2px var(--bezel-contact);
+
+  /* Tile-level bezel — kept very light because tiles are usually rendered
+   * in close vertical stacks (e.g. Restore option-cards, Utilities mode
+   * grid). A heavy shadow here reads as visual noise where rows neighbour
+   * each other, so this stack is mostly a hairline rim + a faint highlight
+   * with an almost-imperceptible ambient. */
+  --tile-bezel-shadow:
+    inset 0 1px 0 var(--bezel-highlight),
+    inset 0 0 0 1px var(--bezel-rim),
+    0 1px 2px -2px var(--bezel-contact);
+
+  --content-shadow: var(--bezel-shadow);
 
   /* Control sizing — keeps inputs / selects / buttons / toggle pills
    * visually aligned in rows. Every form control across the app should
@@ -91,6 +131,15 @@
   --color-text-primary: #F5F5F7;
   --color-text-secondary: #98989D;
   --color-border: #38383A;
+
+  /* Dark-mode bezel: highlight uses a translucent white to read as a lit
+   * top edge, ambient shadow is just enough to lift cards off the dark
+   * shell without dominating stacked rows. */
+  --bezel-highlight: rgba(255, 255, 255, 0.08);
+  --bezel-rim: rgba(255, 255, 255, 0.03);
+  --bezel-floor: rgba(0, 0, 0, 0.18);
+  --bezel-ambient: rgba(0, 0, 0, 0.30);
+  --bezel-contact: rgba(0, 0, 0, 0.18);
 }
 
 /* Glass chrome — drops the opaque shell gradient so the native macOS
@@ -110,6 +159,25 @@
   --color-bg-sidebar: rgb(var(--sidebar-rgb) / var(--sidebar-opacity));
   --color-bg-elevated: rgb(var(--content-rgb) / var(--content-opacity));
   --color-border: rgba(210, 210, 215, 0.55);
+
+  /* Glass chrome amplifies the highlight + rim slightly so panels still
+   * read as solid pieces of glass over the translucent backdrop, but the
+   * outer ambient stays restrained to keep stacked rows quiet. */
+  --bezel-highlight: rgba(255, 255, 255, 0.75);
+  --bezel-rim: rgba(255, 255, 255, 0.28);
+  --bezel-floor: rgba(0, 0, 0, 0.04);
+  --bezel-ambient: rgba(0, 0, 0, 0.08);
+  --bezel-contact: rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-glass-chrome="true"]:not([data-theme="light"]) {
+    --bezel-highlight: rgba(255, 255, 255, 0.10);
+    --bezel-rim: rgba(255, 255, 255, 0.05);
+    --bezel-floor: rgba(0, 0, 0, 0.22);
+    --bezel-ambient: rgba(0, 0, 0, 0.35);
+    --bezel-contact: rgba(0, 0, 0, 0.22);
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -140,6 +208,14 @@
 
     /* Borders */
     --color-border: #38383A;
+
+    /* Bezel — match data-theme="dark" so system-following users get the
+     * same liquid-glass look as users who pick Dark explicitly. */
+    --bezel-highlight: rgba(255, 255, 255, 0.08);
+    --bezel-rim: rgba(255, 255, 255, 0.03);
+    --bezel-floor: rgba(0, 0, 0, 0.18);
+    --bezel-ambient: rgba(0, 0, 0, 0.30);
+    --bezel-contact: rgba(0, 0, 0, 0.18);
   }
 }
 
@@ -272,4 +348,27 @@ button {
 :where(button:disabled) {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+/* ----- Liquid-glass bezel application -----
+ * Wrapped in :where() so per-view scoped styles still win on properties
+ * they explicitly set (border-radius, background, border, padding). The
+ * box-shadow stack here is the missing piece that turns flat tinted
+ * rectangles into pieces of frosted glass with a lit top edge.
+ *
+ * Panels (full-width section containers) get the heavier --bezel-shadow.
+ * Tiles (small list-item cards inside panels) get the softer
+ * --tile-bezel-shadow so nested surfaces don't visually compete.
+ */
+:where(.panel,
+       .about-card,
+       .hero-card,
+       .downloader-panel,
+       .device-summary,
+       .settings-list) {
+  box-shadow: var(--bezel-shadow);
+}
+
+:where(.option-card, .step-card) {
+  box-shadow: var(--tile-bezel-shadow);
 }

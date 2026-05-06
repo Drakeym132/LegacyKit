@@ -158,6 +158,27 @@ export function listFirmwares(request: FirmwareListRequest): Promise<FirmwareLis
   return invoke<FirmwareListResult>('list_firmwares', { request });
 }
 
+export interface ExistingIpswEntry {
+  path: string;
+  fileName: string;
+  sizeBytes: number;
+  deviceIdentifier: string | null;
+}
+
+export interface ListExistingIpswsRequest {
+  deviceIdentifier?: string | null;
+}
+
+export interface ListExistingIpswsResult {
+  ipsws: ExistingIpswEntry[];
+}
+
+export function listExistingIpsws(
+  request: ListExistingIpswsRequest,
+): Promise<ListExistingIpswsResult> {
+  return invoke<ListExistingIpswsResult>('list_existing_ipsws', { request });
+}
+
 export function checkIpswSigning(
   request: CheckIpswSigningRequest,
 ): Promise<CheckIpswSigningResult> {

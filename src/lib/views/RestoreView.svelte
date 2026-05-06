@@ -33,8 +33,9 @@
   let verifyResult = $state<IpswVerifyResult | null>(null);
 
   let selectedTool = $state<RestoreTool>('ideviceRestore');
-  let erase = $state(true);
-  let update = $state(false);
+  let restoreMode = $state<'erase' | 'update'>('erase');
+  const erase = $derived(restoreMode === 'erase');
+  const update = $derived(restoreMode === 'update');
   let usePwndfu = $state(false);
   let skipBlob = $state(false);
   let setNonce = $state(false);
@@ -432,22 +433,40 @@
         <h2>Restore Command</h2>
       </div>
 
-      <div class="form-grid">
-        <label>
+      <div class="tool-row" class:single={selectedTool !== 'ideviceRestore'}>
+        <label class="tool-select">
           <span>Tool</span>
           <select bind:value={selectedTool}>
             <option value="ideviceRestore">idevicerestore</option>
             <option value="futureRestore">futurerestore</option>
           </select>
         </label>
+
+        {#if selectedTool === 'ideviceRestore'}
+          <div class="segmented" role="radiogroup" aria-label="Restore mode">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={restoreMode === 'erase'}
+              class:active={restoreMode === 'erase'}
+              onclick={() => (restoreMode = 'erase')}
+            >
+              Erase restore
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={restoreMode === 'update'}
+              class:active={restoreMode === 'update'}
+              onclick={() => (restoreMode = 'update')}
+            >
+              Update restore
+            </button>
+          </div>
+        {/if}
       </div>
 
-      {#if selectedTool === 'ideviceRestore'}
-        <div class="toggle-grid">
-          <label><input type="checkbox" bind:checked={erase} disabled={update} /> Erase restore</label>
-          <label><input type="checkbox" bind:checked={update} disabled={erase} /> Update restore</label>
-        </div>
-      {:else}
+      {#if selectedTool === 'futureRestore'}
         <div class="toggle-grid">
           <label><input type="checkbox" bind:checked={noBaseband} /> No baseband</label>
           <label><input type="checkbox" bind:checked={latestSep} /> Latest SEP</label>
@@ -686,6 +705,65 @@
   .toggle-grid label:has(input:disabled) {
     opacity: 0.55;
     cursor: not-allowed;
+  }
+
+  .tool-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--spacing-md);
+  }
+
+  .tool-row .tool-select {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+
+  .tool-row.single .tool-select {
+    flex-basis: 100%;
+  }
+
+  .segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    flex: 1 1 320px;
+    min-width: 0;
+    /* Match the height of the adjacent <select> control. */
+    height: var(--control-h);
+    padding: 3px;
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    gap: 2px;
+  }
+
+  .segmented button {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0 var(--spacing-md);
+    border-radius: calc(var(--radius-sm) - 2px);
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  }
+
+  .segmented button:hover:not(.active) {
+    color: var(--color-text-primary);
+  }
+
+  .segmented button.active {
+    background: var(--color-accent);
+    color: #ffffff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  }
+
+  .segmented button:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
   }
 
   .actions {

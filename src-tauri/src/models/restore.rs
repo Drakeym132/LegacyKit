@@ -176,3 +176,24 @@ pub struct IpswPrepareRequest {
 pub struct IpswPrepareResult {
     pub output_path: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExistingIpswEntry {
+    pub path: String,
+    pub file_name: String,
+    pub size_bytes: u64,
+    pub device_identifier: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListExistingIpswsRequest {
+    pub device_identifier: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListExistingIpswsResult {
+    pub ipsws: Vec<ExistingIpswEntry>,
+}

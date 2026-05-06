@@ -2,10 +2,11 @@ use crate::error::AppError;
 use crate::models::device::DeviceInfo;
 use crate::models::restore::{
     CancelIpswDownloadRequest, CancelIpswDownloadResult, CheckIpswSigningRequest,
-    CheckIpswSigningResult, FirmwareListEntry, FirmwareListRequest, FirmwareListResult,
-    IpswDownloadRequest, IpswDownloadResult, IpswPrepareRequest, IpswPrepareResult,
-    IpswVerifyRequest, IpswVerifyResult, RestoreCommandPreview, RestoreOptionsResponse,
-    RestoreRunRequest, RestoreTool,
+    CheckIpswSigningResult, ExistingIpswEntry, FirmwareListEntry, FirmwareListRequest,
+    FirmwareListResult, IpswDownloadRequest, IpswDownloadResult, IpswPrepareRequest,
+    IpswPrepareResult, IpswVerifyRequest, IpswVerifyResult, ListExistingIpswsRequest,
+    ListExistingIpswsResult, RestoreCommandPreview, RestoreOptionsResponse, RestoreRunRequest,
+    RestoreTool,
 };
 use crate::platform::resolve_binary_path;
 use crate::services::ipsw_prep;
@@ -211,6 +212,74 @@ pub async fn cancel_ipsw_download(
         download_id,
         cancelled: status.success(),
     })
+}
+
+#[tauri::command]
+pub async fn list_existing_ipsws(
+    app: AppHandle,
+    request: ListExistingIpswsRequest,
+) -> Result<ListExistingIpswsResult, AppError> {
+    let layout = workspace::get_layout(&app)?;
+    let ipsw_root = layout.ipsw_dir(None);
+
+    let mut ipsws: Vec<ExistingIpswEntry> = Vec::new();
+
+    // If a specific device is requested, only scan that device's subdirectory
+    let scan_dirs = if let Some(ref device) = request.device_identifier {
+        vec![layout.ipsw_dir(Some(device))]
+    } else {
+        // Scan all subdirectories under ipsw/
+        let mut dirs = vec![];
+        if ipsw_root.exists() {
+            if let Ok(entries) = fs::read_dir(&ipsw_root) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        dirs.push(path);
+                    }
+                }
+            }
+        }
+        dirs
+    };
+
+    for dir in scan_dirs {
+        if !dir.exists() {
+            continue;
+        }
+        let device_identifier = dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .filter(|n| *n != "unknown-device")
+            .map(ToOwned::to_owned);
+
+        if let Ok(entries) = fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().is_some_and(|ext| ext == "ipsw") {
+                    if let Ok(metadata) = entry.metadata() {
+                        let file_name = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .map(ToOwned::to_owned)
+                            .unwrap_or_default();
+
+                        ipsws.push(ExistingIpswEntry {
+                            path: path.to_string_lossy().to_string(),
+                            file_name,
+                            size_bytes: metadata.len(),
+                            device_identifier: device_identifier.clone(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort by filename for consistent ordering
+    ipsws.sort_by(|a, b| a.file_name.cmp(&b.file_name));
+
+    Ok(ListExistingIpswsResult { ipsws })
 }
 
 #[tauri::command]
@@ -680,22 +749,30 @@ struct ParsedAria2Progress {
 }
 
 fn parse_aria2_progress_line(line: &str) -> Option<ParsedAria2Progress> {
-    let size_idx = line.find("SIZE:")?;
-    let size_slice = &line[size_idx + 5..];
-    let slash_idx = size_slice.find('/')?;
-    let downloaded_raw = size_slice[..slash_idx].trim();
-
-    let after_slash = &size_slice[slash_idx + 1..];
-    let total_end = after_slash.find('(').unwrap_or(after_slash.len());
-    let total_raw = after_slash[..total_end].trim();
-
-    let percent = if let Some(open) = line.find('(') {
-        let pct_segment = &line[open + 1..];
-        let pct_token = pct_segment.split('%').next().unwrap_or("").trim();
-        pct_token.parse::<f64>().ok()
-    } else {
-        None
-    };
+    // aria2c progress format: [#<gid> <downloaded>/<total>(<percent>%) CN:<n> DL:<speed> [ETA:<time>]]
+    // Example: [#84ef04 6.1MiB/0.9GiB(0%) CN:8 DL:30MiB ETA:31s]
+    
+    // Guard: must start with [# to identify aria2c progress lines
+    let bracket_gid = line.find("[#")?;
+    let after_bracket = &line[bracket_gid + 2..];
+    
+    // Find the space after the gid (e.g., "84ef04 ")
+    let space_after_gid = after_bracket.find(' ')?;
+    let size_segment = &after_bracket[space_after_gid + 1..];
+    
+    // Find '/' to split downloaded from total(percent%)
+    let slash_idx = size_segment.find('/')?;
+    let downloaded_raw = size_segment[..slash_idx].trim();
+    
+    // After slash, find '(' to split total from percent
+    let after_slash = &size_segment[slash_idx + 1..];
+    let paren_idx = after_slash.find('(')?;
+    let total_raw = after_slash[..paren_idx].trim();
+    
+    // Extract percent from between '(' and '%'
+    let after_paren = &after_slash[paren_idx + 1..];
+    let pct_end = after_paren.find('%')?;
+    let percent = after_paren[..pct_end].trim().parse::<f64>().ok();
 
     let speed_bps = line
         .find("DL:")

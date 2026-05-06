@@ -109,216 +109,228 @@
 <div class="view view--narrow">
   <div class="settings-group">
     <h3>Appearance</h3>
-    <div class="setting-row">
-      <div class="setting-info">
-        <label for="theme-select">Theme</label>
-        <span class="setting-hint">Choose how LegacyKit appears</span>
+    <div class="settings-list">
+      <div class="setting-row">
+        <div class="setting-info">
+          <label for="theme-select">Theme</label>
+          <span class="setting-hint">Choose how LegacyKit appears</span>
+        </div>
+        <select
+          id="theme-select"
+          value={settingsStore.theme}
+          onchange={handleThemeChange}
+        >
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
       </div>
-      <select
-        id="theme-select"
-        value={settingsStore.theme}
-        onchange={handleThemeChange}
-      >
-        <option value="system">System</option>
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-      </select>
-    </div>
-    <div class="setting-row">
-      <div class="setting-info">
-        <label for="glass-chrome-toggle">Glass effect</label>
-        <span class="setting-hint">Keep the background chrome but add blur/translucency to sidebar and content</span>
+      <div class="setting-row">
+        <div class="setting-info">
+          <label for="glass-chrome-toggle">Glass effect</label>
+          <span class="setting-hint">Keep the background chrome but add blur/translucency to sidebar and content</span>
+        </div>
+        <label class="toggle">
+          <input
+            id="glass-chrome-toggle"
+            type="checkbox"
+            checked={settingsStore.glassChrome}
+            onchange={handleGlassChromeToggle}
+          />
+          <span class="toggle-slider"></span>
+        </label>
       </div>
-      <label class="toggle">
-        <input
-          id="glass-chrome-toggle"
-          type="checkbox"
-          checked={settingsStore.glassChrome}
-          onchange={handleGlassChromeToggle}
-        />
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-    <div class="setting-row" class:disabled={!settingsStore.glassChrome}>
-      <div class="setting-info">
-        <label for="sidebar-opacity">Sidebar opacity</label>
-        <span class="setting-hint">How opaque the sidebar surface is over the glass chrome</span>
+      <div class="setting-row" class:disabled={!settingsStore.glassChrome}>
+        <div class="setting-info">
+          <label for="sidebar-opacity">Sidebar opacity</label>
+          <span class="setting-hint">How opaque the sidebar surface is over the glass chrome</span>
+        </div>
+        <div class="range-control">
+          <input
+            id="sidebar-opacity"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            disabled={!settingsStore.glassChrome}
+            value={Math.round(settingsStore.sidebarOpacity * 100)}
+            oninput={handleSidebarOpacityChange}
+          />
+          <span>{Math.round(settingsStore.sidebarOpacity * 100)}%</span>
+        </div>
       </div>
-      <div class="range-control">
-        <input
-          id="sidebar-opacity"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          disabled={!settingsStore.glassChrome}
-          value={Math.round(settingsStore.sidebarOpacity * 100)}
-          oninput={handleSidebarOpacityChange}
-        />
-        <span>{Math.round(settingsStore.sidebarOpacity * 100)}%</span>
-      </div>
-    </div>
-    <div class="setting-row" class:disabled={!settingsStore.glassChrome}>
-      <div class="setting-info">
-        <label for="content-opacity">Content opacity</label>
-        <span class="setting-hint">How opaque the main content surface is over the glass chrome</span>
-      </div>
-      <div class="range-control">
-        <input
-          id="content-opacity"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          disabled={!settingsStore.glassChrome}
-          value={Math.round(settingsStore.contentOpacity * 100)}
-          oninput={handleContentOpacityChange}
-        />
-        <span>{Math.round(settingsStore.contentOpacity * 100)}%</span>
+      <div class="setting-row" class:disabled={!settingsStore.glassChrome}>
+        <div class="setting-info">
+          <label for="content-opacity">Content opacity</label>
+          <span class="setting-hint">How opaque the main content surface is over the glass chrome</span>
+        </div>
+        <div class="range-control">
+          <input
+            id="content-opacity"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            disabled={!settingsStore.glassChrome}
+            value={Math.round(settingsStore.contentOpacity * 100)}
+            oninput={handleContentOpacityChange}
+          />
+          <span>{Math.round(settingsStore.contentOpacity * 100)}%</span>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="settings-group">
     <h3>Accessibility</h3>
-    <div class="setting-row">
-      <div class="setting-info">
-        <label for="reduce-motion-toggle">Reduce Motion</label>
-        <span class="setting-hint">Disable view-scroll, sidebar slide, and other UI animations</span>
+    <div class="settings-list">
+      <div class="setting-row">
+        <div class="setting-info">
+          <label for="reduce-motion-toggle">Reduce Motion</label>
+          <span class="setting-hint">Disable view-scroll, sidebar slide, and other UI animations</span>
+        </div>
+        <label class="toggle">
+          <input
+            id="reduce-motion-toggle"
+            type="checkbox"
+            checked={settingsStore.reduceMotion}
+            onchange={handleReduceMotionToggle}
+          />
+          <span class="toggle-slider"></span>
+        </label>
       </div>
-      <label class="toggle">
-        <input
-          id="reduce-motion-toggle"
-          type="checkbox"
-          checked={settingsStore.reduceMotion}
-          onchange={handleReduceMotionToggle}
-        />
-        <span class="toggle-slider"></span>
-      </label>
     </div>
   </div>
 
   <div class="settings-group">
     <h3>Terminal</h3>
-    <div class="setting-row">
-      <div class="setting-info">
-        <label for="terminal-toggle">Show Terminal</label>
-        <span class="setting-hint">Display the log terminal panel</span>
+    <div class="settings-list">
+      <div class="setting-row">
+        <div class="setting-info">
+          <label for="terminal-toggle">Show Terminal</label>
+          <span class="setting-hint">Display the log terminal panel</span>
+        </div>
+        <label class="toggle">
+          <input
+            id="terminal-toggle"
+            type="checkbox"
+            checked={settingsStore.terminalVisible}
+            onchange={handleTerminalToggle}
+          />
+          <span class="toggle-slider"></span>
+        </label>
       </div>
-      <label class="toggle">
-        <input
-          id="terminal-toggle"
-          type="checkbox"
-          checked={settingsStore.terminalVisible}
-          onchange={handleTerminalToggle}
-        />
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-    <div class="setting-row">
-      <div class="setting-info">
-        <label for="terminal-height">Terminal Height</label>
-        <span class="setting-hint">Adjust the terminal panel size</span>
-      </div>
-      <div class="range-control">
-        <input
-          id="terminal-height"
-          type="range"
-          min="100"
-          max="600"
-          step="20"
-          value={settingsStore.terminalHeight}
-          oninput={handleTerminalHeightChange}
-        />
-        <span>{settingsStore.terminalHeight}px</span>
+      <div class="setting-row">
+        <div class="setting-info">
+          <label for="terminal-height">Terminal Height</label>
+          <span class="setting-hint">Adjust the terminal panel size</span>
+        </div>
+        <div class="range-control">
+          <input
+            id="terminal-height"
+            type="range"
+            min="100"
+            max="600"
+            step="20"
+            value={settingsStore.terminalHeight}
+            oninput={handleTerminalHeightChange}
+          />
+          <span>{settingsStore.terminalHeight}px</span>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="settings-group">
     <h3>Device Detection</h3>
-    <div class="setting-row">
-      <div class="setting-info">
-        <label for="auto-detect-toggle">Auto-Detect Device</label>
-        <span class="setting-hint">Automatically detect connected devices</span>
+    <div class="settings-list">
+      <div class="setting-row">
+        <div class="setting-info">
+          <label for="auto-detect-toggle">Auto-Detect Device</label>
+          <span class="setting-hint">Automatically detect connected devices</span>
+        </div>
+        <label class="toggle">
+          <input
+            id="auto-detect-toggle"
+            type="checkbox"
+            checked={settingsStore.autoDetectDevice}
+            onchange={handleAutoDetectToggle}
+          />
+          <span class="toggle-slider"></span>
+        </label>
       </div>
-      <label class="toggle">
+      <div class="setting-row">
+        <div class="setting-info">
+          <label for="poll-interval">Poll Interval (ms)</label>
+          <span class="setting-hint">How often to check for device changes (min: 1000ms)</span>
+        </div>
         <input
-          id="auto-detect-toggle"
-          type="checkbox"
-          checked={settingsStore.autoDetectDevice}
-          onchange={handleAutoDetectToggle}
+          id="poll-interval"
+          type="number"
+          min="1000"
+          step="500"
+          value={settingsStore.pollIntervalMs}
+          onchange={handlePollIntervalChange}
         />
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-    <div class="setting-row">
-      <div class="setting-info">
-        <label for="poll-interval">Poll Interval (ms)</label>
-        <span class="setting-hint">How often to check for device changes (min: 1000ms)</span>
       </div>
-      <input
-        id="poll-interval"
-        type="number"
-        min="1000"
-        step="500"
-        value={settingsStore.pollIntervalMs}
-        onchange={handlePollIntervalChange}
-      />
-    </div>
-    <div class="setting-row">
-      <div class="setting-info">
-        <label for="auto-pwndfu-toggle">Auto-enter pwnDFU in Just Boot</label>
-        <span class="setting-hint">When the Just Boot modal opens with the device already in DFU, run the pwn exploit immediately.</span>
+      <div class="setting-row">
+        <div class="setting-info">
+          <label for="auto-pwndfu-toggle">Auto-enter pwnDFU in Just Boot</label>
+          <span class="setting-hint">When the Just Boot modal opens with the device already in DFU, run the pwn exploit immediately.</span>
+        </div>
+        <label class="toggle">
+          <input
+            id="auto-pwndfu-toggle"
+            type="checkbox"
+            checked={settingsStore.autoEnterPwnDfu}
+            onchange={() => (settingsStore.autoEnterPwnDfu = !settingsStore.autoEnterPwnDfu)}
+          />
+          <span class="toggle-slider"></span>
+        </label>
       </div>
-      <label class="toggle">
-        <input
-          id="auto-pwndfu-toggle"
-          type="checkbox"
-          checked={settingsStore.autoEnterPwnDfu}
-          onchange={() => (settingsStore.autoEnterPwnDfu = !settingsStore.autoEnterPwnDfu)}
-        />
-        <span class="toggle-slider"></span>
-      </label>
     </div>
   </div>
 
   <div class="settings-group">
     <h3>Workspace</h3>
-    <div class="setting-row">
-      <div class="setting-info">
-        <span class="setting-title">Workspace folder</span>
-        <span class="setting-hint">{settingsStore.workspaceRoot ?? 'Not configured'}</span>
+    <div class="settings-list">
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-title">Workspace folder</span>
+          <span class="setting-hint">{settingsStore.workspaceRoot ?? 'Not configured'}</span>
+        </div>
+        <button class="update-button" onclick={handleChooseWorkspace}>Change…</button>
       </div>
-      <button class="update-button" onclick={handleChooseWorkspace}>Change…</button>
-    </div>
-    <div class="setting-row">
-      <div class="setting-info">
-        <span class="setting-title">Actions</span>
-        <span class="setting-hint">Reveal workspace or run onboarding again</span>
-      </div>
-      <div class="button-group">
-        <button class="update-button" onclick={handleRevealWorkspace} disabled={!settingsStore.workspaceRoot}>Reveal</button>
-        <button class="update-button" onclick={handleRestartOnboarding}>Reset onboarding</button>
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-title">Actions</span>
+          <span class="setting-hint">Reveal workspace or run onboarding again</span>
+        </div>
+        <div class="button-group">
+          <button class="update-button" onclick={handleRevealWorkspace} disabled={!settingsStore.workspaceRoot}>Reveal</button>
+          <button class="update-button" onclick={handleRestartOnboarding}>Reset onboarding</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="settings-group">
     <h3>Updates</h3>
-    <div class="setting-row">
-      <div class="setting-info">
-        <label for="update-check">Check for updates</label>
-        <span class="setting-hint">Compares against the latest GitHub release</span>
+    <div class="settings-list">
+      <div class="setting-row">
+        <div class="setting-info">
+          <label for="update-check">Check for updates</label>
+          <span class="setting-hint">Compares against the latest GitHub release</span>
+        </div>
+        <button
+          id="update-check"
+          class="update-button"
+          onclick={handleCheckUpdates}
+          disabled={isCheckingUpdates}
+        >
+          {isCheckingUpdates ? 'Checking…' : 'Check now'}
+        </button>
       </div>
-      <button
-        id="update-check"
-        class="update-button"
-        onclick={handleCheckUpdates}
-        disabled={isCheckingUpdates}
-      >
-        {isCheckingUpdates ? 'Checking…' : 'Check now'}
-      </button>
     </div>
     {#if updateResult}
       <div class="update-result" data-state={updateResult.updateAvailable ? 'available' : 'current'}>
@@ -358,18 +370,28 @@
     margin-bottom: var(--spacing-sm);
   }
 
+  /* Grouped list — the .settings-list wrapper is the bezel-bearing card;
+   * rows sit flush against each other inside it with a hairline divider
+   * between them (macOS System Settings pattern). Inner row corners stay
+   * square; the wrapper's overflow + border-radius clips the outermost
+   * rows so the whole group reads as one rounded card. */
+  .settings-list {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-secondary);
+    overflow: hidden;
+  }
   .setting-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--color-bg-secondary);
-    border-radius: var(--radius-md);
-    margin-bottom: 1px;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: transparent;
   }
-  .setting-row:first-of-type { border-radius: var(--radius-md) var(--radius-md) 0 0; }
-  .setting-row:last-of-type { border-radius: 0 0 var(--radius-md) var(--radius-md); margin-bottom: 0; }
-  .setting-row:only-of-type { border-radius: var(--radius-md); }
+  .setting-row + .setting-row {
+    border-top: 1px solid var(--color-border);
+  }
   .setting-row.disabled { opacity: 0.5; }
 
   .setting-info {

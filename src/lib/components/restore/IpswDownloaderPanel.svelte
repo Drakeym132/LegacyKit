@@ -4,8 +4,10 @@
     cancelIpswDownload,
     checkIpswSigning,
     downloadIpsw,
+    listExistingIpsws,
     listFirmwares,
     onIpswDownloadProgress,
+    type ExistingIpswEntry,
     type FirmwareListEntry,
     type IpswDownloadProgressEvent,
   } from '$lib/api/restore';
@@ -36,6 +38,8 @@
   let downloadedSha1Matches = $state<boolean | null>(null);
   let signingKnown = $state<boolean | null>(null);
 
+  let existingIpsws = $state<ExistingIpswEntry[]>([]);
+
   let unlistenProgress: (() => void) | null = null;
 
   let selectedFirmware = $derived(
@@ -57,6 +61,27 @@
       void refreshFirmwares();
     }
   });
+
+  $effect(() => {
+    if (deviceIdentifier) {
+      void loadExistingIpsws();
+    }
+  });
+
+  async function loadExistingIpsws() {
+    if (!deviceIdentifier) return;
+    try {
+      const result = await listExistingIpsws({ deviceIdentifier });
+      existingIpsws = result.ipsws;
+    } catch (error) {
+      console.error('Failed to list existing IPSWs:', error);
+    }
+  }
+
+  function useExistingIpsw(ipsw: ExistingIpswEntry) {
+    onUseIpsw(ipsw.path, null);
+    toastStore.success('IPSW selected', ipsw.fileName);
+  }
 
   void onIpswDownloadProgress((event) => {
     if (!currentDownloadId || event.downloadId !== currentDownloadId) return;
@@ -241,6 +266,23 @@
     </table>
   </div>
 
+  {#if existingIpsws.length > 0}
+    <div class="existing-section">
+      <h4>Existing IPSWs in Workspace</h4>
+      <div class="existing-list">
+        {#each existingIpsws as ipsw}
+          <div class="existing-item">
+            <div class="existing-info">
+              <span class="existing-name">{ipsw.fileName}</span>
+              <span class="existing-size">{formatBytes(ipsw.sizeBytes)}</span>
+            </div>
+            <button class="secondary" onclick={() => useExistingIpsw(ipsw)}>Use</button>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
   <div class="actions">
     <button class="secondary" onclick={startDownload} disabled={!canDownload}>
       Download selected IPSW
@@ -256,7 +298,7 @@
         value={progress?.percent ?? null}
         max={100}
         label="Download progress"
-        indeterminate={progress?.percent === null}
+        indeterminate={progress === null || progress.percent === null}
       />
       <div class="progress-meta">
         <span>{formatBytes(progress?.downloadedBytes ?? null)} / {formatBytes(progress?.totalBytes ?? null)}</span>
@@ -457,5 +499,54 @@
   code {
     overflow-wrap: anywhere;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  .existing-section {
+    margin-top: var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-sm);
+    background: var(--color-bg-primary);
+  }
+
+  .existing-section h4 {
+    margin: 0 0 var(--spacing-sm);
+    font-size: 0.85rem;
+    color: var(--color-text-primary);
+  }
+
+  .existing-list {
+    display: grid;
+    gap: var(--spacing-xs);
+  }
+
+  .existing-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    padding: 6px 8px;
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-sm);
+  }
+
+  .existing-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .existing-name {
+    font-size: 0.8rem;
+    color: var(--color-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .existing-size {
+    font-size: 0.72rem;
+    color: var(--color-text-secondary);
   }
 </style>

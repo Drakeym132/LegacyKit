@@ -237,30 +237,36 @@
     <p class="section-note">Provide the source IPSW and in-archive paths. Outputs resolve into workspace directories automatically.</p>
 
     <div class="form-grid">
-      <label>
+      <label class="span-2">
         <span>Source IPSW</span>
         <input bind:value={ipswPath} placeholder="/path/to/firmware.ipsw" />
       </label>
-      <div class="inline-note span-2">
-        Extracted output directory: <code>{workspaceExtractedDir || 'Workspace not configured'}</code>
-      </div>
       <label>
-        <span>Build ID <em>(for Just Boot history)</em></span>
+        <span>Build ID <em>(for history)</em></span>
         <input bind:value={buildId} placeholder="e.g. 13G36" />
       </label>
       <label>
         <span>iOS version <em>(optional)</em></span>
         <input bind:value={iosVersion} placeholder="e.g. 9.3.5" />
       </label>
-      <label>
+
+      <div class="label-group span-4">
+        <span>Extracted output directory</span>
+        <div class="inline-note">
+          <code>{workspaceExtractedDir || 'Workspace not configured'}</code>
+        </div>
+      </div>
+
+      <label class="span-2">
         <span>iBSS path inside IPSW</span>
         <input bind:value={ibssIpswPath} placeholder="Firmware/dfu/iBSS.n41ap.RELEASE.im4p" />
       </label>
-      <label>
+      <label class="span-2">
         <span>iBEC path inside IPSW</span>
         <input bind:value={ibecIpswPath} placeholder="Firmware/dfu/iBEC.n41ap.RELEASE.im4p" />
       </label>
-      <label>
+
+      <label class="span-2">
         <span>Kernel path inside IPSW</span>
         <input bind:value={kernelIpswPath} placeholder="kernelcache.release.n41" />
       </label>
@@ -269,19 +275,24 @@
         <input bind:value={ramdiskIpswPath} placeholder="058-12345-123.dmg" />
       </label>
       <label>
+        <span>Size (MB)</span>
+        <input type="number" bind:value={ramdiskTargetSizeMb} min="20" max="100" />
+      </label>
+
+      <label class="span-2">
         <span>SHSH blob</span>
         <input bind:value={shshPath} placeholder="/path/to/blob.shsh" />
       </label>
-      <div class="inline-note">
-        SSH binaries directory: <code>{workspaceSshBinariesDir || 'Workspace not configured'}</code>
+      <div class="label-group span-2">
+        <span>SSH binaries directory</span>
+        <div class="inline-note">
+          <code>{workspaceSshBinariesDir || 'Workspace not configured'}</code>
+        </div>
       </div>
-      <label class="span-2">
+
+      <label class="span-4">
         <span>Boot arguments</span>
         <input bind:value={bootArgs} placeholder="rd=md0 -v amfi_get_out_of_my_way=0x1" />
-      </label>
-      <label>
-        <span>Ramdisk target size (MB)</span>
-        <input type="number" bind:value={ramdiskTargetSizeMb} min="20" max="100" />
       </label>
     </div>
 
@@ -463,12 +474,51 @@
 
   .form-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--spacing-md);
   }
 
   .span-2 {
+    grid-column: span 2;
+  }
+
+  .span-4 {
     grid-column: 1 / -1;
+  }
+
+  .label-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .label-group > span {
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  /* Inline workspace-path info: rendered as a read-only field with long
+   * absolute paths that wrap at any character instead of overflowing the
+   * panel. Visually styled to match the form inputs (same radius, border,
+   * and background) so it reads as a read-only companion field. */
+  .inline-note {
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-primary);
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+  }
+
+  .inline-note code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    color: var(--color-text-primary);
+    overflow-wrap: anywhere;
+    word-break: break-all;
   }
 
   label {

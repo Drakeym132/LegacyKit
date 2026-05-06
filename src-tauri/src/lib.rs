@@ -205,6 +205,7 @@ pub fn run() {
             commands::restore::list_firmwares,
             commands::restore::check_ipsw_signing,
             commands::restore::cancel_ipsw_download,
+            commands::restore::list_existing_ipsws,
             commands::restore::download_ipsw,
             commands::restore::verify_ipsw,
             commands::restore::prepare_ipsw,
