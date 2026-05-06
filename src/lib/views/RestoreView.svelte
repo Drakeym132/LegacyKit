@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    downloadIpsw,
     getRestoreOptions,
     prepareIpsw,
     previewRestoreCommand,
@@ -14,7 +13,7 @@
     type RestoreRunRequest,
     type RestoreTool,
   } from '$lib/api/restore';
-  import IpswDownloaderPanel from '$lib/components/restore/IpswDownloaderPanel.svelte';
+  import IpswPane from '$lib/components/restore/IpswPane.svelte';
   import { deviceStore } from '$lib/stores/deviceStore.svelte';
   import { logStore } from '$lib/stores/logStore.svelte';
   import { toastStore } from '$lib/stores/toastStore.svelte';
@@ -27,8 +26,6 @@
   let requestId = 0;
 
   let ipswPath = $state('');
-  let downloadUrl = $state('');
-  let downloadFileName = $state('');
   let expectedSha1 = $state('');
   let verifyResult = $state<IpswVerifyResult | null>(null);
 
@@ -122,32 +119,6 @@
     selectedIndex = index;
     verifyResult = null;
     preview = null;
-  }
-
-  async function handleDownload() {
-    isWorking = true;
-    errorMessage = null;
-    preview = null;
-    logStore.append('Starting IPSW download...', 'info');
-
-    try {
-      const result = await downloadIpsw({
-        url: downloadUrl,
-        outputDir: '',
-        deviceIdentifier: restoreOptions?.productType ?? deviceStore.state.product_type ?? null,
-        fileName: downloadFileName || null,
-        expectedSha1: expectedSha1 || null,
-        downloadId: null,
-      });
-      ipswPath = result.path;
-      logStore.append(`Downloaded IPSW: ${result.path}`, 'info');
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : String(error);
-      logStore.append(`Download failed: ${errorMessage}`, 'stderr');
-      toastStore.error('Download failed', errorMessage);
-    } finally {
-      isWorking = false;
-    }
   }
 
   async function handleVerify() {
@@ -311,6 +282,7 @@
       </div>
       <div class="options-list">
         {#each restoreOptions.options as option, index}
+          {#if option.kind !== 'ipswDownloader'}
           <button
             class:active={index === selectedIndex}
             class="option-card"
@@ -332,6 +304,7 @@
               {/if}
             </div>
           </button>
+          {/if}
         {/each}
       </div>
     </section>
@@ -341,6 +314,13 @@
         <span>2</span>
         <h2>IPSW</h2>
       </div>
+
+      <IpswPane
+        option={selectedOption}
+        productType={restoreOptions.productType}
+        onSelect={handleUseDownloadedIpsw}
+      />
+
       <div class="form-grid">
         <label>
           <span>Target IPSW Path</span>
@@ -369,32 +349,6 @@
           {:else}
             <strong>Calculated</strong>
           {/if}
-        </div>
-      {/if}
-
-      {#if selectedOption?.kind === 'ipswDownloader'}
-        <IpswDownloaderPanel
-          deviceIdentifier={restoreOptions.productType}
-          onUseIpsw={handleUseDownloadedIpsw}
-        />
-      {:else}
-        <div class="download-box">
-          <p class="workspace-destination-note">Download destination: workspace <code>ipsw/&lt;device&gt;</code></p>
-          <div class="form-grid">
-            <label>
-              <span>Download URL</span>
-              <input bind:value={downloadUrl} placeholder="https://...Restore.ipsw" />
-            </label>
-            <label>
-              <span>File Name</span>
-              <input bind:value={downloadFileName} placeholder="Optional" />
-            </label>
-          </div>
-          <div class="actions">
-            <button class="secondary" onclick={handleDownload} disabled={isWorking || !downloadUrl}>
-              Download with aria2c
-            </button>
-          </div>
         </div>
       {/if}
     </section>
@@ -655,12 +609,6 @@
     color: var(--color-text-primary);
     font: inherit;
     /* height + padding inherited from global :where() rules in app.css */
-  }
-
-  .download-box {
-    border-top: 1px solid var(--color-border);
-    margin-top: var(--spacing-md);
-    padding-top: var(--spacing-md);
   }
 
   .workspace-destination-note,
