@@ -37,14 +37,14 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
     font-size: 0.78rem;
     color: var(--color-text-secondary);
   }
   .label { font-weight: 600; color: var(--color-text-primary); }
   .pct { font-variant-numeric: tabular-nums; }
   .track {
-    height: 6px;
+    height: 8px;
     border-radius: 999px;
     background: var(--color-bg-secondary);
     overflow: hidden;

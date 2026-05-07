@@ -4,10 +4,9 @@ use crate::platform::resolve_binary_path;
 use crate::services::device_parser::{parse_ideviceinfo, parse_irecovery_q};
 use std::process::Command;
 
-#[tauri::command]
-pub async fn detect_device(app: tauri::AppHandle) -> Result<DeviceInfo, AppError> {
+pub fn detect_device_inner(app: &tauri::AppHandle) -> Result<DeviceInfo, AppError> {
     // Try ideviceinfo first (normal mode)
-    if let Ok(ideviceinfo_path) = resolve_binary_path(&app, "ideviceinfo") {
+    if let Ok(ideviceinfo_path) = resolve_binary_path(app, "ideviceinfo") {
         if let Ok(output) = Command::new(&ideviceinfo_path).output() {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -17,7 +16,7 @@ pub async fn detect_device(app: tauri::AppHandle) -> Result<DeviceInfo, AppError
     }
 
     // Fallback: try irecovery for Recovery/DFU mode
-    if let Ok(irecovery_path) = resolve_binary_path(&app, "irecovery") {
+    if let Ok(irecovery_path) = resolve_binary_path(app, "irecovery") {
         if let Ok(output) = Command::new(&irecovery_path).arg("-q").output() {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -28,4 +27,9 @@ pub async fn detect_device(app: tauri::AppHandle) -> Result<DeviceInfo, AppError
 
     // No device found
     Ok(DeviceInfo::default())
+}
+
+#[tauri::command]
+pub async fn detect_device(app: tauri::AppHandle) -> Result<DeviceInfo, AppError> {
+    detect_device_inner(&app)
 }

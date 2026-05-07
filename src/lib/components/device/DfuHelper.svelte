@@ -10,13 +10,13 @@
   }
 
   const homeSteps: Step[] = [
-    { label: 'Press and hold Power + Home', seconds: 4 },
-    { label: 'Release Power, keep holding Home', seconds: 10 },
+    { label: 'Press and hold Power + Home', seconds: 10 },
+    { label: 'Release Power, keep holding Home', seconds: 8 },
   ];
 
   const volDownSteps: Step[] = [
-    { label: 'Press and hold Side + Volume Down', seconds: 4 },
-    { label: 'Release Side, keep holding Volume Down', seconds: 10 },
+    { label: 'Press and hold Side + Volume Down', seconds: 10 },
+    { label: 'Release Side, keep holding Volume Down', seconds: 8 },
   ];
 
   let combo = $derived<ButtonCombo>(detectCombo(deviceStore.state.product_type));

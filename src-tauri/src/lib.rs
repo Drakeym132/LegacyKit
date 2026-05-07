@@ -173,7 +173,13 @@ pub(crate) fn set_vibrancy_visible(window: &tauri::WebviewWindow, visible: bool)
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .level_for("nusb", log::LevelFilter::Warn)
+                .level_for("tao", log::LevelFilter::Warn)
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Initialize log persistence (best-effort, non-fatal on error).
@@ -197,6 +203,9 @@ pub fn run() {
             {
                 let _ = app;
             }
+
+            tauri::async_runtime::spawn(services::device_watcher::run(app.handle().clone()));
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -225,6 +234,7 @@ pub fn run() {
             commands::just_boot::forget_just_boot,
             commands::just_boot::prepare_and_just_boot,
             commands::firmware::extract_ipsw_component,
+            commands::firmware::extract_ipsw_metadata,
             commands::firmware::patch_iboot,
             commands::firmware::pack_img4,
             commands::firmware::repack_img3,

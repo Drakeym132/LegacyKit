@@ -20,7 +20,7 @@
 
   $effect(() => {
     const autoDetectDevice = settingsStore.autoDetectDevice;
-    const pollIntervalMs = settingsStore.pollBoostMs ?? settingsStore.pollIntervalMs;
+    const pollIntervalMs = settingsStore.pollIntervalMs;
 
     if (pollInterval) {
       clearInterval(pollInterval);
@@ -93,8 +93,18 @@
       logStore.append(text, type);
     });
 
+    const unlistenDevice = listen<DeviceInfo>('device-state-changed', (event) => {
+      const info = event.payload;
+      if (info && info.connected) {
+        deviceStore.updateFromBackend(info);
+      } else {
+        deviceStore.clearDevice();
+      }
+    });
+
     return () => {
       unlistenLog.then(fn => fn());
+      unlistenDevice.then(fn => fn());
     };
   });
 

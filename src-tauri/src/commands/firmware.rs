@@ -116,6 +116,84 @@ fn extract_zip_entry(
     Ok(bytes)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IpswMetadataRequest {
+    pub ipsw_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IpswMetadata {
+    pub build_id: String,
+    pub ios_version: String,
+    pub supported_product_types: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn extract_ipsw_metadata(
+    request: IpswMetadataRequest,
+) -> Result<IpswMetadata, AppError> {
+    let ipsw_path = request.ipsw_path.trim().to_string();
+    if ipsw_path.is_empty() {
+        return Err(AppError::Parse("IPSW path is required".to_string()));
+    }
+    if !Path::new(&ipsw_path).exists() {
+        return Err(AppError::Parse(format!("IPSW does not exist: {ipsw_path}")));
+    }
+
+    tauri::async_runtime::spawn_blocking(move || read_ipsw_metadata(&ipsw_path))
+        .await
+        .map_err(|e| AppError::CommandFailed(format!("Metadata task panicked: {e}")))?
+}
+
+fn read_ipsw_metadata(ipsw_path: &str) -> Result<IpswMetadata, AppError> {
+    let file = File::open(ipsw_path)?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| AppError::CommandFailed(format!("Failed to open IPSW: {e}")))?;
+
+    let mut entry = archive
+        .by_name("BuildManifest.plist")
+        .map_err(|e| AppError::Parse(format!("BuildManifest.plist not found in IPSW: {e}")))?;
+
+    let mut bytes = Vec::with_capacity(entry.size() as usize);
+    io::Read::read_to_end(&mut entry, &mut bytes)?;
+
+    let value: plist::Value = plist::from_bytes(&bytes)
+        .map_err(|e| AppError::Parse(format!("Failed to parse BuildManifest.plist: {e}")))?;
+    let dict = value
+        .as_dictionary()
+        .ok_or_else(|| AppError::Parse("BuildManifest.plist is not a dictionary".to_string()))?;
+
+    let build_id = dict
+        .get("ProductBuildVersion")
+        .and_then(|v| v.as_string())
+        .ok_or_else(|| AppError::Parse("ProductBuildVersion missing in BuildManifest".to_string()))?
+        .to_string();
+
+    let ios_version = dict
+        .get("ProductVersion")
+        .and_then(|v| v.as_string())
+        .ok_or_else(|| AppError::Parse("ProductVersion missing in BuildManifest".to_string()))?
+        .to_string();
+
+    let supported_product_types = dict
+        .get("SupportedProductTypes")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    Ok(IpswMetadata {
+        build_id,
+        ios_version,
+        supported_product_types,
+    })
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum IbootBitWidth {

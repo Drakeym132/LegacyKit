@@ -74,6 +74,16 @@ export function extractIpswComponent(request: IpswExtractRequest): Promise<IpswE
   return invoke<IpswExtractResult>('extract_ipsw_component', { request });
 }
 
+export interface IpswMetadata {
+  buildId: string;
+  iosVersion: string;
+  supportedProductTypes: string[];
+}
+
+export function extractIpswMetadata(ipswPath: string): Promise<IpswMetadata> {
+  return invoke<IpswMetadata>('extract_ipsw_metadata', { request: { ipswPath } });
+}
+
 export function patchIboot(request: IbootPatchRequest): Promise<IbootPatchResult> {
   return invoke<IbootPatchResult>('patch_iboot', { request });
 }

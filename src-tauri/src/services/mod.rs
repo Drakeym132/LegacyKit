@@ -2,6 +2,7 @@ pub mod app_settings;
 pub mod bootchain;
 pub mod device_meta;
 pub mod device_parser;
+pub mod device_watcher;
 pub mod external_tools;
 pub mod firmware_keys;
 pub mod ipsw_prep;
