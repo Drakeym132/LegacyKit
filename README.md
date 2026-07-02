@@ -1,5 +1,7 @@
 # LegacyKit
 
+<img width="1326" height="1065" alt="Screenshot 2026-05-04 at 3 30 15 PM" src="https://github.com/user-attachments/assets/5a33d42e-5a85-486c-9e1f-39aee3000ddb" />
+
 > Cross-platform iOS device restore, downgrade, and jailbreak toolkit.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
