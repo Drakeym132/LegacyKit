@@ -48,9 +48,7 @@ Prebuilt bundles are published on the
 | Linux (x64, arm64) | `.deb`, `.rpm`, `.AppImage` |
 
 > **Linux note:** USB device access (DFU/recovery/normal) requires `udev` rules
-> for libimobiledevice and the bundled checkm8 tooling. See the install section
-> of [`docs/USER-GUIDE.md`](docs/USER-GUIDE.md:1) for the exact rules and group
-> membership requirements.
+> for libimobiledevice and the bundled checkm8 tooling. 
 
 ## Quickstart
 
