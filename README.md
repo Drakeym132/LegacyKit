@@ -1,6 +1,6 @@
 # LegacyKit
 
-<img width="1326" height="1065" alt="Screenshot 2026-05-04 at 3 30 15 PM" src="https://github.com/user-attachments/assets/5a33d42e-5a85-486c-9e1f-39aee3000ddb" />
+<img width="1174" height="1032" alt="Mask group-3" src="https://github.com/user-attachments/assets/715505f0-f51c-4bf2-bb8b-0d4c22148f17" />
 
 > Cross-platform iOS device restore, downgrade, and jailbreak toolkit.
 
